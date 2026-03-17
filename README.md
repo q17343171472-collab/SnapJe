@@ -1,184 +1,68 @@
-# SnapJe! ??
 
-A modern Android photo gallery application built with Jetpack Compose and Material Design 3. Browse, organize, and manage your photos with a clean, intuitive interface.
+      1 # SnapJe! 📸
+      2
+      3 A modern, feature-rich Android photo gallery application built with **Jetpack Compose**
+        and **Kotlin**. SnapJe! provides a clean, intuitive interface for browsing, organizing,
+        and managing your photos with smooth animations and Material Design 3 aesthetics.
+      4
+      5 ## ✨ Why SnapJe!?
+      6
+      7 - ** Modern UI** - Built entirely with Jetpack Compose for smooth, native Android
+        experience
+      8 - **🏗️ Clean Architecture* - MVVM + Clean Architecture pattern for maintainability
+      9 - **⚡ Performance** - Hardware-accelerated transitions and optimized image loading
+     10 - **🗑️ Smart Trash* - 30-day retention with easy restore functionality
+     11 - **🎨 Material Design 3** - Beautiful, adaptive UI that follows Android design guidelines
+     12 - **🔍 Powerful Search** - Quick search through all your photos
+     13 - **📁 Category Browsing** - Organized folder/category view with animated grids
+     14 - **🖐️ Multi-Select* - Intuitive drag-to-select gesture for batch operations
+     15
+     16 ## 🛠️ Built With
+     17
+     18 | Technology | Purpose |
+     19 |------------|---------|
+     20 | Kotlin 2.2.10 | Primary language |
+     21 | Jetpack Compose | Modern UI toolkit |
+     22 | Hilt | Dependency injection |
+     23 | Coil | Image loading |
+     24 | Room | Local database |
+     25 | Navigation Compose | In-app navigation |
+     26 | Material Design 3 | UI components & theming |
+     27
+     28 ## 📋 Features
+     29
+     30 ### Photo Management
+     31 - Browse photos organized by folders/categories
+     32 - Full-screen photo viewer with pinch-to-zoom (up to 5x)
+     33 - Double-tap to zoom, swipe to navigate
+     34 - Copy, move, rename, and share photos
+     35 - Batch operations with multi-select
+     36
+     37 ### Smart Organization
+     38 - Animated category grid with Material Design cards
+     39 - Search functionality across all photos
+     40 - Custom sorting options (date, name, size)
+     41 - Empty state illustrations for better UX
+     42
+     43 ### Trash & Recovery
+     44 - Recently Deleted folder with 30-day retention
+     45 - Batch delete with confirmation
+     46 - Easy restore functionality
+     47 - Automatic cleanup of expired items
+     48
+     49 ## 🚀 Quick Start
+    Clone the repository
+    git clone https://github.com/rapierrevorn/SnapJe.git
 
-![SnapJe! Banner](docs/banner.png)
+    Build debug APK
+    .\gradlew.bat assembleDebug
 
-## ? Features
+    Install on device
+    .\gradlew.bat installDebug
 
-### Photo Management
-- **Photo Browsing** - View photos organized by folders/categories
-- **Multi-Select** - Drag-to-select gesture for batch operations
-- **Search** - Quick search through all your photos
-- **Photo Operations** - Copy, move, rename, and share photos
+     1
+     2 ## 📄 License
+     3
+     4 This project is open source and available under the [MIT License](LICENSE).
 
-### Gallery Experience
-- **Fullscreen Viewer** - Immersive full-screen photo display
-- **Pinch-to-Zoom** - Smooth zoom gestures (up to 5x magnification)
-- **Double-Tap Zoom** - Quick zoom toggle with double-tap
-- **Pan & Navigate** - Pan when zoomed, swipe between photos when not
-
-### Smart Organization
-- **Category Grid** - Beautiful animated category cards
-- **Smooth Transitions** - Optimized navigation with hardware acceleration
-- **Empty States** - Elegant illustrations for empty folders
-
-### Trash & Recovery
-- **Recently Deleted** - Trash folder with 30-day retention
-- **Restore Photos** - Easily recover deleted items
-- **Batch Delete** - Select and delete multiple photos at once
-
-## ?? Screenshots
-
-| Home Screen | Category View | Fullscreen | Trash |
-|-------------|---------------|------------|-------|
-| ![Home](docs/screenshots/home.png) | ![Category](docs/screenshots/category.png) | ![Fullscreen](docs/screenshots/fullscreen.png) | ![Trash](docs/screenshots/trash.png) |
-
-## ??? Tech Stack
-
-| Component | Technology |
-|-----------|------------|
-| **Language** | Kotlin 2.2.10 |
-| **UI Framework** | Jetpack Compose (BOM 2025.05.00) |
-| **Architecture** | MVVM + Clean Architecture |
-| **Dependency Injection** | Hilt 2.54 |
-| **Image Loading** | Coil 2.5.0 |
-| **Navigation** | Navigation Compose 2.9.0 |
-| **Min SDK** | 24 (Android 7.0) |
-| **Target SDK** | 35 (Android 15) |
-
-## ?? Getting Started
-
-### Prerequisites
-
-- Android Studio Hedgehog or later
-- JDK 17
-- Android SDK 35
-
-### Build Commands
-
-```powershell
-# Debug build
-.\gradlew.bat assembleDebug
-
-# Release build
-.\gradlew.bat assembleRelease
-
-# Install on connected device
-.\gradlew.bat installDebug
-
-# Clean build
-.\gradlew.bat clean
-
-# Run all tests
-.\gradlew.bat test
-
-# Run lint checks
-.\gradlew.bat lint
-```
-
-### Install APK
-
-```powershell
-# Debug APK location
-app\build\outputs\apk\debug\app-debug.apk
-
-# Release APK location
-app\build\outputs\apk\release\app-release.apk
-```
-
-## ?? Project Structure
-
-```
-SnapJe!/
-??? app/                          # Main application module
-?   ??? src/main/
-?   ?   ??? java/com/rapii/snapje/
-?   ?   ?   ??? data/             # Data layer
-?   ?   ?   ?   ??? FileOperations.kt
-?   ?   ?   ?   ??? PhotoRepository.kt
-?   ?   ?   ?   ??? TrashRepository.kt
-?   ?   ?   ?   ??? models.kt
-?   ?   ?   ??? di/               # Hilt DI modules
-?   ?   ?   ??? domain/           # Business logic
-?   ?   ?   ??? navigation/       # Navigation graph
-?   ?   ?   ??? ui/               # UI layer (Composables)
-?   ?   ?   ?   ??? PhotoXHomeScreen.kt
-?   ?   ?   ?   ??? CategoryDetailScreen.kt
-?   ?   ?   ?   ??? PhotoGalleryScreen.kt
-?   ?   ?   ?   ??? RecentlyDeletedScreen.kt
-?   ?   ?   ?   ??? components/   # Reusable components
-?   ?   ?   ??? util/             # Utilities
-?   ?   ?   ??? GalleryXApplication.kt
-?   ?   ?   ??? MainActivity.kt
-?   ?   ??? res/                  # Android resources
-?   ?   ??? AndroidManifest.xml
-?   ??? build.gradle.kts
-??? core/                         # Core utilities module
-??? data/                         # Shared data layer
-??? domain/                       # Business logic layer
-??? gradle/
-    ??? libs.versions.toml        # Version catalog
-```
-
-## ??? Architecture
-
-SnapJe! follows **MVVM + Clean Architecture** principles:
-
-```
-???????????????????
-?   UI Layer      ?  ? Composables + ViewModels (Hilt)
-???????????????????
-?  Domain Layer   ?  ? Use Cases (Business Logic)
-???????????????????
-?   Data Layer    ?  ? Repositories + Data Sources
-???????????????????
-?  MediaStore     ?  ? Photo Storage & Trash Management
-???????????????????
-```
-
-## ?? Design
-
-- **Material Design 3** - Modern, adaptive UI components
-- **Custom Icon** - Purple/blue gradient with photo frame design
-- **Smooth Animations** - Hardware-accelerated transitions
-- **Dark Mode Ready** - Theme system supports light/dark modes
-
-## ?? Permissions
-
-```xml
-<!-- Android 13+ -->
-<uses-permission android:name="android.permission.READ_MEDIA_IMAGES" />
-
-<!-- Android 12 and below -->
-<uses-permission 
-    android:name="android.permission.READ_EXTERNAL_STORAGE" 
-    android:maxSdkVersion="32" />
-```
-
-## ?? Known Issues & Fixes
-
-See [AGENTS.md](AGENTS.md) for detailed bug fixes and solutions:
-
-- ? Scroll jumps after fullscreen - Fixed with offset tracking
-- ? Copy fails in some categories - URI type detection added
-- ? Photo quality degradation - Original size loading implemented
-- ? Drag-to-select not working - Custom pointer handler added
-- ? Batch delete issues - Single trash request for all URIs
-- ? Restored photo thumbnail missing - PhotoRestoreEventManager added
-
-## ?? License
-
-This project is open source. Feel free to use, modify, and distribute.
-
-## ?? Contributing
-
-Contributions are welcome! Please feel free to submit a Pull Request.
-
-## ?? Contact
-
-For issues or questions, please open an issue on the GitHub repository.
-
----
-
-**SnapJe! v1.1** - Built with ?? using Jetpack Compose
+    ---
