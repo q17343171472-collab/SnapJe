@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+    SnapJe! App Icon Foreground
+    Full icon displayed at 108dp for adaptive icon
+-->
+<bitmap xmlns:android="http://schemas.android.com/apk/res/android"
+    android:src="@drawable/adaptive_foreground"
+    android:gravity="fill"
+    android:tileMode="disabled" />

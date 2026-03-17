@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources xmlns:tools="http://schemas.android.com/tools">
+    <!-- Base application theme with hardware acceleration enabled -->
+    <style name="Theme.GalleryX" parent="android:Theme.Material.Light.NoActionBar">
+        <!-- Enable hardware acceleration for smooth transitions -->
+        <item name="android:hardwareAccelerated">true</item>
+        <!-- Optimize window transitions -->
+        <item name="android:windowBackground">@android:color/white</item>
+        <item name="android:statusBarColor">@android:color/transparent</item>
+        <!-- Enable content transitions -->
+        <item name="android:windowContentTransitions">true</item>
+        <!-- Optimize for smooth navigation -->
+        <item name="android:windowAllowEnterTransitionOverlap">true</item>
+        <item name="android:windowAllowReturnTransitionOverlap">true</item>
+    </style>
+    <style name="Theme.App.Starting" parent="Theme.SplashScreen">
+        <item name="windowSplashScreenBackground">@color/splash_background</item>
+        <item name="windowSplashScreenAnimatedIcon">@drawable/adaptive_foreground</item>
+        <item name="windowSplashScreenAnimationDuration">200</item>
+        <item name="postSplashScreenTheme">@style/Theme.GalleryX</item>
+    </style>
+</resources>
