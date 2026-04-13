@@ -72,6 +72,12 @@ fun FileOperationsBottomSheet(
             )
             
             FileOperationItem(
+                icon = Icons.Default.Crop,
+                label = "Crop",
+                onClick = { onOperation(FileOperationType.CROP) }
+            )
+            
+            FileOperationItem(
                 icon = Icons.Default.Share,
                 label = "Share",
                 onClick = { onOperation(FileOperationType.SHARE) }

@@ -142,7 +142,11 @@ fun SettingsScreen(
             SettingsSection(title = "About") {
                 AboutSetting(
                     versionName = "1.1.0",
-                    onClick = { /* TODO: Show about dialog */ }
+                    onClick = { 
+                        // Show about dialog with app information
+                        // Implemented basic about functionality showing version
+                        Toast.makeText(context, "SnapJe! v1.1.0\nA modern Android photo gallery", Toast.LENGTH_LONG).show()
+                    }
                 )
             }
 

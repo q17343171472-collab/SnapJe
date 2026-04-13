@@ -242,7 +242,7 @@ private fun PhotoGridItem(
     AsyncImage(
         model = ImageRequest.Builder(LocalContext.current)
             .data(photo.uri)
-            .crossfade(true)
+            .crossfade(false)
             .build(),
         contentDescription = photo.displayName,
         contentScale = ContentScale.Crop,

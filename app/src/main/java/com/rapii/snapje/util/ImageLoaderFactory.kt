@@ -35,7 +35,7 @@ object ImageLoaderFactory {
                     .maxSizeBytes(Constants.IMAGE_MAX_DISK_CACHE_SIZE_MB * 1024 * 1024)
                     .build()
             }
-            .crossfade(true)
+            .crossfade(false)
             .respectCacheHeaders(false)
             .build()
     }
@@ -87,7 +87,7 @@ object ImageLoaderFactory {
                     .maxSizeBytes(Constants.IMAGE_THUMBNAIL_DISK_CACHE_SIZE_MB * 1024 * 1024)
                     .build()
             }
-            .crossfade(true)
+            .crossfade(false)
             .respectCacheHeaders(false)
             .build()
     }
@@ -113,7 +113,7 @@ object ImageLoaderFactory {
                     .maxSizeBytes(Constants.IMAGE_TRASH_DISK_CACHE_SIZE_MB * 1024 * 1024)
                     .build()
             }
-            .crossfade(true)
+            .crossfade(false)
             .respectCacheHeaders(false)
             .build()
     }

@@ -1,7 +1,9 @@
 ﻿package com.rapii.snapje.ui
 
 import android.app.Activity
+import android.content.Intent
 import android.graphics.Bitmap
+import android.provider.MediaStore
 import android.widget.Toast
 import androidx.activity.compose.LocalOnBackPressedDispatcherOwner
 import androidx.activity.compose.rememberLauncherForActivityResult
@@ -118,6 +120,35 @@ fun PhotoGalleryScreen(
     var showMoveDialog by remember { mutableStateOf(false) }
 
     var pendingDeletePhoto by remember { mutableStateOf<PhotoItem?>(null) }
+    
+    // Crop activity launcher
+    val cropLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.StartActivityForResult()
+    ) { result ->
+        if (result.resultCode == Activity.RESULT_OK) {
+            Toast.makeText(context, "Photo cropped successfully", Toast.LENGTH_SHORT).show()
+        }
+    }
+    
+    // Function to launch crop activity
+    fun launchCropActivity(photo: PhotoItem) {
+        try {
+            val intent = Intent("com.android.camera.action.CROP").apply {
+                setDataAndType(photo.uri, "image/*")
+                putExtra("crop", "true")
+                putExtra("aspectX", 0)
+                putExtra("aspectY", 0)
+                putExtra("outputX", 1024)
+                putExtra("outputY", 1024)
+                putExtra("return-data", false)
+                putExtra(MediaStore.EXTRA_OUTPUT, photo.uri)
+                addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_GRANT_WRITE_URI_PERMISSION)
+            }
+            cropLauncher.launch(intent)
+        } catch (e: Exception) {
+            Toast.makeText(context, "Crop not available on this device", Toast.LENGTH_SHORT).show()
+        }
+    }
     data class PendingRename(val photo: PhotoItem, val newName: String)
     var pendingRename by remember { mutableStateOf<PendingRename?>(null) }
 
@@ -274,6 +305,11 @@ fun PhotoGalleryScreen(
                             FileOperationType.MOVE -> {
                                 showOperationsMenu = false
                                 showMoveDialog = true
+                            }
+                            FileOperationType.CROP -> {
+                                showOperationsMenu = false
+                                // Launch crop activity for the current photo
+                                launchCropActivity(currentPhoto)
                             }
                             FileOperationType.SHARE -> {
                                 showOperationsMenu = false

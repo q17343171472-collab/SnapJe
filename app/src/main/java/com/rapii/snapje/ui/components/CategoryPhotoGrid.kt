@@ -54,7 +54,7 @@ fun CategoryPhotoGridItemWithLongPress(
         AsyncImage(
             model = ImageRequest.Builder(LocalContext.current)
                 .data(photo.uri)
-                .crossfade(true)
+                .crossfade(false)
                 .build(),
             contentDescription = null,
             modifier = Modifier.fillMaxSize(),
