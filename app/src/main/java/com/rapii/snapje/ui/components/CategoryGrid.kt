@@ -32,9 +32,6 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
-import androidx.compose.animation.AnimatedVisibility
-import androidx.compose.animation.fadeIn
-import androidx.compose.animation.fadeOut
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -86,19 +83,14 @@ fun CategoryGrid(
                 items = categories,
                 key = { it.id }  // Stable IDs for view recycling
             ) { category ->
-                // CRITICAL: Use lightweight fade-in only - no scale animations for better performance
-                AnimatedVisibility(
-                    visible = true,
-                    enter = fadeIn(),
-                    exit = fadeOut()
-                ) {
-                    CategoryCard(
-                        category = category,
-                        onClick = { onCategoryClick(category) },
-                        onTogglePin = { onTogglePin(category.id) },
-                        onHideCategory = { onHideCategory(category.id) }
-                    )
-                }
+                // CRITICAL: Removed AnimatedVisibility to eliminate scroll lag
+                // Items are now rendered directly without fade-in animations
+                CategoryCard(
+                    category = category,
+                    onClick = { onCategoryClick(category) },
+                    onTogglePin = { onTogglePin(category.id) },
+                    onHideCategory = { onHideCategory(category.id) }
+                )
             }
         }
     }
@@ -257,7 +249,7 @@ fun CategoryThumbnail(
     val imageRequest = remember(category.coverUris, context) {
         ImageRequest.Builder(context)
             .data(category.coverUris.firstOrNull())
-            .crossfade(true)
+            .crossfade(false)
             .build()
     }
     

@@ -33,7 +33,7 @@ sealed class FileOperationResult {
  * Types of file operations available.
  */
 enum class FileOperationType {
-    DELETE, COPY, RENAME, MOVE, SHARE, INFO
+    DELETE, COPY, RENAME, MOVE, SHARE, INFO, CROP
 }
 
 /**
