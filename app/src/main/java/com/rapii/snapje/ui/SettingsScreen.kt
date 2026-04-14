@@ -459,7 +459,8 @@ data class SettingsState(
  */
 @HiltViewModel
 class SettingsViewModel @Inject constructor(
-    private val settingsManager: SettingsManager
+    private val settingsManager: SettingsManager,
+    private val cachedPhotoRepository: com.rapii.snapje.data.CachedPhotoRepository
 ) : ViewModel() {
 
     val settingsFlow: StateFlow<SettingsState> = settingsManager.settingsFlow
@@ -490,8 +491,8 @@ class SettingsViewModel @Inject constructor(
     }
 
     suspend fun clearCache() {
-        // TODO: Implement actual cache clearing logic
-        // For now, just clear Coil image cache
-        settingsManager.setCacheSizeMB(settingsFlow.value.cacheSizeMB)
+        // Clear Room database cache
+        cachedPhotoRepository.clearCache()
+        // Note: Coil image cache is managed automatically by Coil's MemoryCache and DiskCache
     }
 }
