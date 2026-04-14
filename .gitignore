@@ -1,45 +1,26 @@
 ```
-# Backup files
-*.bak
-
-# Kotlin/Android build artifacts
-*.class
-*.jar
-*.war
-*.aar
-
-# Build directories
-build/
-.gradle/
-target/
-
 # Dependencies
-node_modules/
-vendor/bundle
+.gradle/
+build/
 
-# IDE files
-.idea/
-.vscode/
-*.iml
-*.ipr
-*.iws
-
-# Temp files
-*.tmp
-*.temp
+# Logs and temp files
 *.log
+*.tmp
 
 # Environment
 .env
 .env.local
-*.env.*
+.env.*
 
-# OS files
-.DS_Store
-Thumbs.db
+# Editors
+.vscode/
+.idea/
 
-# Coverage
+# Test coverage
+.coverage
 coverage/
 htmlcov/
-.coverage
+
+# Original rules preserved
+*.log
 ```
