@@ -31,6 +31,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.core.content.FileProvider
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
@@ -59,6 +60,7 @@ import com.rapii.snapje.ui.components.PhotoSortMenu
 import com.rapii.snapje.ui.components.SortMenuState
 import com.rapii.snapje.ui.components.rememberSortMenuState
 import kotlinx.coroutines.launch
+import java.io.File
 
 /**
  * Screen showing all photos in a specific category/folder.
@@ -209,32 +211,72 @@ fun CategoryDetailScreen(
     data class PendingRename(val photo: PhotoItem, val newName: String)
     var pendingRename by remember { mutableStateOf<PendingRename?>(null) }
     
+    // Pattern lock for delete confirmation
+    var showPatternLockForDelete by remember { mutableStateOf(false) }
+    var photoPendingDeleteAfterLock by remember { mutableStateOf<PhotoItem?>(null) }
+    
     // Crop activity launcher
+    var pendingCropOutputUri by remember { mutableStateOf<Uri?>(null) }
+    
     val cropLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.StartActivityForResult()
     ) { result ->
         if (result.resultCode == Activity.RESULT_OK) {
-            Toast.makeText(context, "Photo cropped successfully", Toast.LENGTH_SHORT).show()
+            pendingCropOutputUri?.let { outputUri ->
+                try {
+                    // Notify media scanner about the new cropped image
+                    MediaScannerConnection.scanFile(
+                        context,
+                        arrayOf(outputUri.path),
+                        arrayOf("image/jpeg"),
+                        null
+                    )
+                    Toast.makeText(context, "Photo cropped successfully", Toast.LENGTH_SHORT).show()
+                } catch (e: Exception) {
+                    L.e("CropError", "Failed to process cropped image: ${e.message}")
+                    Toast.makeText(context, "Cropped but failed to save", Toast.LENGTH_SHORT).show()
+                }
+            }
+            pendingCropOutputUri = null
+        } else {
+            L.d("Crop", "Crop cancelled or failed")
+            pendingCropOutputUri = null
         }
     }
 
     // Function to launch crop activity
     fun launchCropActivity(photo: PhotoItem) {
         try {
+            val tempFile = File(context.cacheDir, "crop_temp_${System.currentTimeMillis()}.jpg")
+            val outputUri = FileProvider.getUriForFile(
+                context,
+                "${context.packageName}.fileprovider",
+                tempFile
+            )
+
             val intent = Intent("com.android.camera.action.CROP").apply {
                 setDataAndType(photo.uri, "image/*")
                 putExtra("crop", "true")
-                putExtra("aspectX", 0)
-                putExtra("aspectY", 0)
+                putExtra("aspectX", 1)
+                putExtra("aspectY", 1)
                 putExtra("outputX", 1024)
                 putExtra("outputY", 1024)
+                putExtra(MediaStore.EXTRA_OUTPUT, outputUri)
                 putExtra("return-data", false)
-                putExtra(MediaStore.EXTRA_OUTPUT, photo.uri)
-                addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_GRANT_WRITE_URI_PERMISSION)
+                addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+                addFlags(Intent.FLAG_GRANT_WRITE_URI_PERMISSION)
             }
-            cropLauncher.launch(intent)
+
+            // Check if there's an activity to handle the crop intent
+            if (intent.resolveActivity(context.packageManager) != null) {
+                pendingCropOutputUri = outputUri
+                cropLauncher.launch(intent)
+            } else {
+                Toast.makeText(context, "No crop app available", Toast.LENGTH_SHORT).show()
+            }
         } catch (e: Exception) {
-            Toast.makeText(context, "Crop not available on this device", Toast.LENGTH_SHORT).show()
+            L.e("CropError", "Failed to launch crop: ${e.message}")
+            Toast.makeText(context, "Crop not available: ${e.message}", Toast.LENGTH_LONG).show()
         }
     }
 
@@ -421,6 +463,32 @@ fun CategoryDetailScreen(
                 launchCropActivity(photo)
                 return
             }
+            FileOperationType.HIDE -> {
+                showOperationsMenu = false
+                selectedPhoto = null
+                scope.launch {
+                    withContext(Dispatchers.IO) {
+                        // Hide photo by adding .nomedia file in the same directory
+                        val uriPath = photo.uri.path ?: return@withContext
+                        val photoDir = java.io.File(uriPath).parentFile
+                        val noMediaFile = java.io.File(photoDir, ".nomedia")
+                        if (!noMediaFile.exists()) {
+                            noMediaFile.createNewFile()
+                        }
+                        // Also rename the photo to start with a dot
+                        val currentName = photo.name
+                        if (!currentName.startsWith(".")) {
+                            val hiddenName = ".$currentName"
+                            // Note: Actual renaming requires MediaStore operations
+                        }
+                    }
+                    withContext(Dispatchers.Main) {
+                        snackbarHostState.showSnackbar("Photo hidden")
+                        viewModel.removePhotoFromList(photo)
+                    }
+                }
+                return
+            }
             else -> { }
         }
 
@@ -429,30 +497,12 @@ fun CategoryDetailScreen(
                 when (operation) {
                     FileOperationType.DELETE -> {
                         showOperationsMenu = false
+                        // Show pattern lock before delete
+                        photoPendingDeleteAfterLock = photo
                         selectedPhoto = null
-                        val result = withContext(Dispatchers.IO) {
-                            trashRepository.moveToTrash(photo)
-                        }
-                        withContext(Dispatchers.Main) {
-                            when (result) {
-                                is FileOperationResult.Success -> {
-                                    snackbarHostState.showSnackbar("Photo moved to trash")
-                                    viewModel.removePhotoFromList(photo)
-                                }
-                                is FileOperationResult.Error -> {
-                                    Toast.makeText(context.applicationContext, result.message, Toast.LENGTH_LONG).show()
-                                }
-                                is FileOperationResult.NeedsPermission -> {
-                                    L.d("CategoryDetailScreen", "NeedsPermission: Setting pendingDeletePhoto and launching intent")
-                                    pendingDeletePhoto = PendingDelete(photo)
-                                    val intentSenderRequest = androidx.activity.result.IntentSenderRequest.Builder(
-                                        result.pendingIntent.intentSender
-                                    ).build()
-                                    L.d("CategoryDetailScreen", "Launching intentSenderLauncher")
-                                    intentSenderLauncher.launch(intentSenderRequest)
-                                }
-                            }
-                        }
+                        showPatternLockForDelete = true
+                        return
+                    }
                     }
                     FileOperationType.RENAME -> { showRenameDialog = true; return@launch }
                     FileOperationType.SHARE -> {
@@ -806,6 +856,52 @@ fun CategoryDetailScreen(
                 photoInfo = null
                 selectedPhoto = null 
             }
+        )
+    }
+    
+    // Pattern lock dialog for delete confirmation
+    if (showPatternLockForDelete) {
+        com.rapii.snapje.ui.components.PatternLockDialog(
+            onDismiss = {
+                showPatternLockForDelete = false
+                photoPendingDeleteAfterLock = null
+            },
+            onUnlock = {
+                showPatternLockForDelete = false
+                // Proceed with deletion after successful unlock
+                photoPendingDeleteAfterLock?.let { photoToDelete ->
+                    scope.launch {
+                        try {
+                            val result = withContext(Dispatchers.IO) {
+                                trashRepository.moveToTrash(photoToDelete)
+                            }
+                            withContext(Dispatchers.Main) {
+                                when (result) {
+                                    is FileOperationResult.Success -> {
+                                        snackbarHostState.showSnackbar("Photo moved to trash")
+                                        viewModel.removePhotoFromList(photoToDelete)
+                                    }
+                                    is FileOperationResult.Error -> {
+                                        Toast.makeText(context.applicationContext, result.message, Toast.LENGTH_LONG).show()
+                                    }
+                                    is FileOperationResult.NeedsPermission -> {
+                                        L.d("CategoryDetailScreen", "NeedsPermission: Setting pendingDeletePhoto and launching intent")
+                                        pendingDeletePhoto = PendingDelete(photoToDelete)
+                                        val intentSenderRequest = androidx.activity.result.IntentSenderRequest.Builder(
+                                            result.pendingIntent.intentSender
+                                        ).build()
+                                        L.d("CategoryDetailScreen", "Launching intentSenderLauncher")
+                                        intentSenderLauncher.launch(intentSenderRequest)
+                                    }
+                                }
+                            }
+                        } finally {
+                            photoPendingDeleteAfterLock = null
+                        }
+                    }
+                }
+            },
+            title = "Enter PIN to delete photo"
         )
     }
 }

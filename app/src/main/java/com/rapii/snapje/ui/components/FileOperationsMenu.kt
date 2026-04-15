@@ -54,6 +54,12 @@ fun FileOperationsBottomSheet(
             )
             
             FileOperationItem(
+                icon = Icons.Default.HideImage,
+                label = "Hide",
+                onClick = { onOperation(FileOperationType.HIDE) }
+            )
+            
+            FileOperationItem(
                 icon = Icons.Default.Edit,
                 label = "Rename",
                 onClick = { onOperation(FileOperationType.RENAME) }
