@@ -115,7 +115,7 @@ fun CategoryDetailScreen(
     // 双指捏合缩放网格（苹果相册风格）：缩小→列数变多，放大→列数变少
     // ---------------------------------------------------------------------
     val minGridColumns = 2
-    val maxGridColumns = 10
+    val maxGridColumns = 14
     // 当前列数（松手后持久化到全局设置，所有分组共享）
     var gridColumns by remember { mutableIntStateOf(3) }
     // 列数变化动画：丝滑过渡
@@ -180,21 +180,21 @@ fun CategoryDetailScreen(
     // 分组内导入（右下角按钮）+ 导出到相册
     // ---------------------------------------------------------------------
     var showImportSheet by remember { mutableStateOf(false) }
-    var pendingImportUri by remember { mutableStateOf<Uri?>(null) }
+    var pendingImportUris by remember { mutableStateOf<List<Uri>>(emptyList()) }
     var pendingCameraUri by remember { mutableStateOf<Uri?>(null) }
     var showAlbumDialog by remember { mutableStateOf(false) }
     var albumName by remember { mutableStateOf("") }
     var isImporting by remember { mutableStateOf(false) }
 
-    // 删除原图相关
-    var pendingDeleteOriginalUri by remember { mutableStateOf<Uri?>(null) }
+    // 删除原图相关（支持批量）
+    var pendingDeleteOriginalUris by remember { mutableStateOf<List<Uri>>(emptyList()) }
 
-    // 选择照片/视频（支持图片和视频）
+    // 选择照片/视频（支持多选图片和视频）
     val photoPicker = rememberLauncherForActivityResult(
-        contract = ActivityResultContracts.PickVisualMedia()
-    ) { uri ->
-        if (uri != null) {
-            pendingImportUri = uri
+        contract = ActivityResultContracts.PickMultipleVisualMedia()
+    ) { uris ->
+        if (uris.isNotEmpty()) {
+            pendingImportUris = uris
             // 默认导入到当前分组
             albumName = uiState.category?.displayName ?: "我的保险库"
             showAlbumDialog = true
@@ -217,11 +217,11 @@ fun CategoryDetailScreen(
         }
     }
 
-    // 删除相册原图（Android 11+ 弹系统确认框）
+    // 删除相册原图（Android 11+ 弹系统确认框，支持批量）
     val deleteOriginalLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.StartIntentSenderForResult()
     ) { result ->
-        pendingDeleteOriginalUri = null
+        pendingDeleteOriginalUris = emptyList()
         Toast.makeText(
             context,
             if (result.resultCode == Activity.RESULT_OK) R.string.original_deleted else R.string.original_kept,
@@ -263,12 +263,13 @@ fun CategoryDetailScreen(
         }
     }
 
-    fun deleteOriginalFromGallery(uri: Uri) {
+    fun deleteOriginalsFromGallery(uris: List<Uri>) {
+        if (uris.isEmpty()) return
         val resolver = context.contentResolver
-        val mediaUri = toMediaStoreUri(uri)
+        val mediaUris = uris.map { toMediaStoreUri(it) }
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
             try {
-                val pendingIntent = MediaStore.createDeleteRequest(resolver, listOf(mediaUri))
+                val pendingIntent = MediaStore.createDeleteRequest(resolver, mediaUris)
                 val request = androidx.activity.result.IntentSenderRequest.Builder(pendingIntent).build()
                 deleteOriginalLauncher.launch(request)
                 return
@@ -276,58 +277,62 @@ fun CategoryDetailScreen(
                 L.e("CategoryDetail", "createDeleteRequest failed", e)
             }
         }
-        val deleted = runCatching { resolver.delete(mediaUri, null, null) }.getOrDefault(0)
-        if (deleted > 0) {
-            Toast.makeText(context, R.string.original_deleted, Toast.LENGTH_SHORT).show()
-            pendingDeleteOriginalUri = null
-            return
+        // 低版本：逐个删除
+        var deletedCount = 0
+        mediaUris.forEach { mediaUri ->
+            val deleted = runCatching { resolver.delete(mediaUri, null, null) }.getOrDefault(0)
+            if (deleted > 0) deletedCount++
         }
-        // 回退：按文件路径删除
-        val path = runCatching {
-            resolver.query(mediaUri, arrayOf(MediaStore.Images.Media.DATA), null, null, null)
-                ?.use { if (it.moveToFirst()) it.getString(0) else null }
-        }.getOrNull()
-        if (!path.isNullOrBlank()) {
-            val file = File(path)
-            if (file.exists() && file.delete()) {
-                Toast.makeText(context, R.string.original_deleted, Toast.LENGTH_SHORT).show()
-                pendingDeleteOriginalUri = null
-                return
-            }
-        }
-        Toast.makeText(context, R.string.original_delete_failed, Toast.LENGTH_LONG).show()
-        pendingDeleteOriginalUri = null
+        Toast.makeText(
+            context,
+            if (deletedCount > 0) R.string.original_deleted else R.string.original_delete_failed,
+            if (deletedCount > 0) Toast.LENGTH_SHORT else Toast.LENGTH_LONG
+        ).show()
+        pendingDeleteOriginalUris = emptyList()
     }
 
     // 分组内导入：默认归入当前相册分组
     fun clearPendingImport() {
-        pendingImportUri = null
+        pendingImportUris = emptyList()
         cleanupCameraFile()
         showAlbumDialog = false
         showImportSheet = false
     }
 
-    fun performImport(uri: Uri, album: String) {
+    fun performImportBatch(uris: List<Uri>, album: String) {
+        if (uris.isEmpty()) return
         if (isImporting) return
         isImporting = true
         scope.launch {
-            val result = viewModel.addPhotoToVault(uri, album)
+            var successCount = 0
+            val galleryUris = mutableListOf<Uri>()
+            uris.forEach { uri ->
+                val result = viewModel.addPhotoToVault(uri, album)
+                if (result.isSuccess) {
+                    successCount++
+                    if (uri != pendingCameraUri) galleryUris.add(uri)
+                }
+            }
             isImporting = false
-            if (result.isSuccess) {
-                Toast.makeText(context, R.string.import_success, Toast.LENGTH_SHORT).show()
+            if (successCount > 0) {
+                Toast.makeText(
+                    context,
+                    if (uris.size > 1) "已加密导入 $successCount 项到保险库" else context.getString(R.string.import_success),
+                    Toast.LENGTH_SHORT
+                ).show()
                 viewModel.loadPhotos()
-                // 系统相册导入的：按设置决定删除原图或询问（相机临时文件自动清理）
-                if (uri != pendingCameraUri) {
+                // 系统相册导入的：按设置批量删除原图或询问（相机临时文件自动清理）
+                if (galleryUris.isNotEmpty()) {
                     if (settingsManager.isAutoDeleteOriginal()) {
-                        deleteOriginalFromGallery(uri)
+                        deleteOriginalsFromGallery(galleryUris)
                     } else {
-                        pendingDeleteOriginalUri = uri
+                        pendingDeleteOriginalUris = galleryUris
                     }
                 }
             } else {
                 Toast.makeText(
                     context,
-                    context.getString(R.string.import_failed, result.exceptionOrNull()?.message ?: "未知"),
+                    context.getString(R.string.import_failed, "导入失败"),
                     Toast.LENGTH_LONG
                 ).show()
             }
@@ -1383,9 +1388,14 @@ fun CategoryDetailScreen(
             confirmButton = {
                 TextButton(
                     onClick = {
-                        val uri = pendingImportUri ?: pendingCameraUri
-                        if (uri != null) {
-                            performImport(uri, albumName.ifBlank { uiState.category?.displayName ?: "我的保险库" })
+                        // 相册多选 或 相机单张
+                        val uris = if (pendingImportUris.isNotEmpty()) {
+                            pendingImportUris
+                        } else {
+                            pendingCameraUri?.let { listOf(it) } ?: emptyList()
+                        }
+                        if (uris.isNotEmpty()) {
+                            performImportBatch(uris, albumName.ifBlank { uiState.category?.displayName ?: "我的保险库" })
                         }
                     }
                 ) {
@@ -1400,20 +1410,20 @@ fun CategoryDetailScreen(
         )
     }
 
-    // ---- 导入后：询问是否删除相册原图 ----
-    pendingDeleteOriginalUri?.let { originalUri ->
+    // ---- 导入后：询问是否删除相册原图（批量） ----
+    pendingDeleteOriginalUris.takeIf { it.isNotEmpty() }?.let { originalUris ->
         AlertDialog(
-            onDismissRequest = { pendingDeleteOriginalUri = null },
+            onDismissRequest = { pendingDeleteOriginalUris = emptyList() },
             title = { Text(stringResource(R.string.delete_original_title)) },
             text = { Text(stringResource(R.string.delete_original_message)) },
             confirmButton = {
-                TextButton(onClick = { deleteOriginalFromGallery(originalUri) }) {
+                TextButton(onClick = { deleteOriginalsFromGallery(originalUris) }) {
                     Text(stringResource(R.string.delete_original_confirm))
                 }
             },
             dismissButton = {
                 TextButton(onClick = {
-                    pendingDeleteOriginalUri = null
+                    pendingDeleteOriginalUris = emptyList()
                     Toast.makeText(context, R.string.original_kept, Toast.LENGTH_SHORT).show()
                 }) {
                     Text(stringResource(R.string.delete_original_keep))

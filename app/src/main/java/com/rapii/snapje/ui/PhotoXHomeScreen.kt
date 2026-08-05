@@ -97,14 +97,14 @@ fun PhotoXHomeScreen(
 
     // ---- 导入状态 ----
     var showImportSheet by remember { mutableStateOf(false) }
-    var pendingImportUri by remember { mutableStateOf<Uri?>(null) }
+    var pendingImportUris by remember { mutableStateOf<List<Uri>>(emptyList()) }
     var pendingCameraUri by remember { mutableStateOf<Uri?>(null) }
     var showAlbumDialog by remember { mutableStateOf(false) }
     var albumName by remember { mutableStateOf("") }
     var existingAlbums by remember { mutableStateOf(listOf<String>()) }
 
-    // ---- 导入成功后是否删除相册原图 ----
-    var pendingDeleteOriginalUri by remember { mutableStateOf<Uri?>(null) }
+    // ---- 导入成功后是否删除相册原图（支持批量） ----
+    var pendingDeleteOriginalUris by remember { mutableStateOf<List<Uri>>(emptyList()) }
 
     // 设置管理器（用于读取"自动删除相册原图"开关）
     val settingsManager = remember { com.rapii.snapje.data.SettingsManager(context.applicationContext) }
@@ -113,7 +113,7 @@ fun PhotoXHomeScreen(
     val deleteOriginalLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.StartIntentSenderForResult()
     ) { result ->
-        pendingDeleteOriginalUri = null
+        pendingDeleteOriginalUris = emptyList()
         if (result.resultCode == Activity.RESULT_OK) {
             Toast.makeText(context, R.string.original_deleted, Toast.LENGTH_SHORT).show()
         } else {
@@ -154,18 +154,15 @@ fun PhotoXHomeScreen(
     }
 
     /**
-     * 从手机相册删除原图（带多重回退，修复部分设备删除失败的问题）：
-     * 1. Android 11+：先转成 MediaStore 标准地址，再弹系统确认框；
-     * 2. 若无法弹框，直接 resolver.delete；
-     * 3. 若仍失败，尝试按文件路径直接删除。
+     * 批量从手机相册删除原图（支持多选导入后一次删除）。
      */
-    fun deleteOriginalFromGallery(uri: Uri) {
+    fun deleteOriginalsFromGallery(uris: List<Uri>) {
+        if (uris.isEmpty()) return
         val resolver = context.contentResolver
-        val mediaUri = toMediaStoreUri(uri)
-
+        val mediaUris = uris.map { toMediaStoreUri(it) }
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
             try {
-                val pendingIntent = MediaStore.createDeleteRequest(resolver, listOf(mediaUri))
+                val pendingIntent = MediaStore.createDeleteRequest(resolver, mediaUris)
                 val request = androidx.activity.result.IntentSenderRequest.Builder(pendingIntent).build()
                 deleteOriginalLauncher.launch(request)
                 return
@@ -173,43 +170,26 @@ fun PhotoXHomeScreen(
                 L.e("PhotoXHome", "createDeleteRequest failed, falling back", e)
             }
         }
-
-        // 回退 1：直接通过 ContentResolver 删除
-        val deleted = runCatching { resolver.delete(mediaUri, null, null) }.getOrDefault(0)
-        if (deleted > 0) {
-            Toast.makeText(context, R.string.original_deleted, Toast.LENGTH_SHORT).show()
-            pendingDeleteOriginalUri = null
-            return
+        // 低版本：逐个删除
+        var deletedCount = 0
+        mediaUris.forEach { mediaUri ->
+            val deleted = runCatching { resolver.delete(mediaUri, null, null) }.getOrDefault(0)
+            if (deleted > 0) deletedCount++
         }
-
-        // 回退 2：按文件路径直接删除
-        try {
-            val path = runCatching {
-                resolver.query(mediaUri, arrayOf(MediaStore.Images.Media.DATA), null, null, null)
-                    ?.use { if (it.moveToFirst()) it.getString(0) else null }
-            }.getOrNull()
-            if (!path.isNullOrBlank()) {
-                val file = java.io.File(path)
-                if (file.exists() && file.delete()) {
-                    Toast.makeText(context, R.string.original_deleted, Toast.LENGTH_SHORT).show()
-                    pendingDeleteOriginalUri = null
-                    return
-                }
-            }
-        } catch (e: Exception) {
-            L.e("PhotoXHome", "File delete fallback failed", e)
-        }
-
-        Toast.makeText(context, R.string.original_delete_failed, Toast.LENGTH_LONG).show()
-        pendingDeleteOriginalUri = null
+        Toast.makeText(
+            context,
+            if (deletedCount > 0) R.string.original_deleted else R.string.original_delete_failed,
+            if (deletedCount > 0) Toast.LENGTH_SHORT else Toast.LENGTH_LONG
+        ).show()
+        pendingDeleteOriginalUris = emptyList()
     }
 
-    // 系统相册选择（Photo Picker，无需存储权限）
+    // 系统相册选择（Photo Picker，支持多选图片/视频）
     val photoPicker = rememberLauncherForActivityResult(
-        contract = ActivityResultContracts.PickVisualMedia()
-    ) { uri ->
-        if (uri != null) {
-            pendingImportUri = uri
+        contract = ActivityResultContracts.PickMultipleVisualMedia()
+    ) { uris ->
+        if (uris.isNotEmpty()) {
+            pendingImportUris = uris
             showAlbumDialog = true
         }
     }
@@ -256,30 +236,38 @@ fun PhotoXHomeScreen(
         pendingCameraUri = null
     }
 
-    // 执行导入（加密存储）
-    fun performImport(uri: Uri, album: String) {
+    // 执行批量导入（加密存储，支持多选）
+    fun performImportBatch(uris: List<Uri>, album: String) {
+        if (uris.isEmpty()) return
         scope.launch {
-            val result = viewModel.addPhotoToVault(uri, album)
-            if (result.isSuccess) {
-                Toast.makeText(context, context.getString(R.string.import_success), Toast.LENGTH_SHORT).show()
-                // 从系统相册导入的：按设置决定删除原图还是询问（相机临时文件自动清理，不处理）
-                if (uri != pendingCameraUri) {
-                    val autoDelete = settingsManager.isAutoDeleteOriginal()
-                    if (autoDelete) {
-                        deleteOriginalFromGallery(uri)
+            var successCount = 0
+            // 需要询问/删除原图的地址（排除相机临时文件）
+            val galleryUris = mutableListOf<Uri>()
+            uris.forEach { uri ->
+                val result = viewModel.addPhotoToVault(uri, album)
+                if (result.isSuccess) {
+                    successCount++
+                    if (uri != pendingCameraUri) {
+                        galleryUris.add(uri)
+                    }
+                }
+            }
+            if (successCount > 0) {
+                Toast.makeText(
+                    context,
+                    if (uris.size > 1) "已加密导入 $successCount 项到保险库" else context.getString(R.string.import_success),
+                    Toast.LENGTH_SHORT
+                ).show()
+                // 从系统相册导入的：按设置批量删除原图或询问（相机临时文件自动清理，不处理）
+                if (galleryUris.isNotEmpty()) {
+                    if (settingsManager.isAutoDeleteOriginal()) {
+                        deleteOriginalsFromGallery(galleryUris)
                     } else {
-                        pendingDeleteOriginalUri = uri
+                        pendingDeleteOriginalUris = galleryUris
                     }
                 }
             } else {
-                Toast.makeText(
-                    context,
-                    context.getString(
-                        R.string.import_failed,
-                        result.exceptionOrNull()?.message ?: "unknown"
-                    ),
-                    Toast.LENGTH_LONG
-                ).show()
+                Toast.makeText(context, R.string.import_failed.let { context.getString(it, "导入失败") }, Toast.LENGTH_LONG).show()
             }
             // 无论成败，清理相机临时原图（避免明文残留在外部存储）
             cleanupCameraFile()
@@ -289,7 +277,7 @@ fun PhotoXHomeScreen(
 
     // 清除待导入状态
     fun clearPendingImport() {
-        pendingImportUri = null
+        pendingImportUris = emptyList()
         cleanupCameraFile()
         showAlbumDialog = false
         showImportSheet = false
@@ -494,12 +482,12 @@ fun PhotoXHomeScreen(
             Column(modifier = Modifier.padding(vertical = 16.dp)) {
                 ImportSourceItem(
                     icon = { Icon(Icons.Outlined.PhotoLibrary, contentDescription = null, tint = MaterialTheme.colorScheme.primary) },
-                    text = stringResource(R.string.pick_from_gallery),
+                    text = "从系统相册选择（可多选）",
                     onClick = {
                         showImportSheet = false
                         photoPicker.launch(
                             PickVisualMediaRequest(
-                                ActivityResultContracts.PickVisualMedia.ImageOnly
+                                ActivityResultContracts.PickVisualMedia.ImageAndVideo
                             )
                         )
                     }
@@ -544,9 +532,14 @@ fun PhotoXHomeScreen(
             confirmButton = {
                 TextButton(
                     onClick = {
-                        val uri = pendingImportUri ?: pendingCameraUri
-                        if (uri != null) {
-                            performImport(uri, albumName)
+                        // 相册多选 或 相机单张
+                        val uris = if (pendingImportUris.isNotEmpty()) {
+                            pendingImportUris
+                        } else {
+                            pendingCameraUri?.let { listOf(it) } ?: emptyList()
+                        }
+                        if (uris.isNotEmpty()) {
+                            performImportBatch(uris, albumName)
                         }
                     }
                 ) {
@@ -561,20 +554,20 @@ fun PhotoXHomeScreen(
         )
     }
 
-    // 导入成功后：询问是否删除相册原图
-    pendingDeleteOriginalUri?.let { originalUri ->
+    // 导入成功后：询问是否删除相册原图（批量）
+    pendingDeleteOriginalUris.takeIf { it.isNotEmpty() }?.let { originalUris ->
         AlertDialog(
-            onDismissRequest = { pendingDeleteOriginalUri = null },
+            onDismissRequest = { pendingDeleteOriginalUris = emptyList() },
             title = { Text(stringResource(R.string.delete_original_title)) },
             text = { Text(stringResource(R.string.delete_original_message)) },
             confirmButton = {
-                TextButton(onClick = { deleteOriginalFromGallery(originalUri) }) {
+                TextButton(onClick = { deleteOriginalsFromGallery(originalUris) }) {
                     Text(stringResource(R.string.delete_original_confirm))
                 }
             },
             dismissButton = {
                 TextButton(onClick = {
-                    pendingDeleteOriginalUri = null
+                    pendingDeleteOriginalUris = emptyList()
                     Toast.makeText(context, R.string.original_kept, Toast.LENGTH_SHORT).show()
                 }) {
                     Text(stringResource(R.string.delete_original_keep))

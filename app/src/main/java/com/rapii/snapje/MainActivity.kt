@@ -84,12 +84,6 @@ class MainActivity : FragmentActivity() {
             WindowManager.LayoutParams.FLAG_HARDWARE_ACCELERATED
         )
 
-        // 隐私保护：禁止截图 / 最近任务缩略图显示保险库内容
-        window.setFlags(
-            WindowManager.LayoutParams.FLAG_SECURE,
-            WindowManager.LayoutParams.FLAG_SECURE
-        )
-
         // Enable edge-to-edge with proper transition support
         enableEdgeToEdge()
 
