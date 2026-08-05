@@ -210,6 +210,47 @@ fun PhotoXHomeScreen(
         }
     }
 
+    /**
+     * 备用方案：ACTION_OPEN_DOCUMENT 的 launcher（通用文件选择器，直接返回 Uri 列表）。
+     */
+    val openDocumentLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.OpenMultipleDocuments()
+    ) { uris ->
+        if (uris.isNotEmpty()) {
+            pendingImportUris = uris
+            showAlbumDialog = true
+        }
+    }
+
+    /**
+     * 调起系统相册选择（图片+视频，多选）。
+     * 优先用 ACTION_PICK（厂商相册，支持长按滑动手势多选）；
+     * 若设备不支持则回退到 ACTION_OPEN_DOCUMENT（通用文件选择器），避免闪退。
+     */
+    fun launchGalleryPicker() {
+        // 方案 1：ACTION_PICK 系统相册
+        val pickIntent = Intent(
+            Intent.ACTION_PICK,
+            MediaStore.Files.getContentUri(MediaStore.VOLUME_EXTERNAL)
+        ).apply {
+            putExtra(Intent.EXTRA_MIME_TYPES, arrayOf("image/*", "video/*"))
+            putExtra(Intent.EXTRA_ALLOW_MULTIPLE, true)
+        }
+        if (pickIntent.resolveActivity(context.packageManager) != null) {
+            galleryLauncher.launch(pickIntent)
+            return
+        }
+        // 方案 2：ACTION_OPEN_DOCUMENT（通用，几乎所有设备可用）
+        openDocumentLauncher.launch(
+            Intent(Intent.ACTION_OPEN_DOCUMENT).apply {
+                addCategory(Intent.CATEGORY_OPENABLE)
+                type = "*/*"
+                putExtra(Intent.EXTRA_MIME_TYPES, arrayOf("image/*", "video/*"))
+                putExtra(Intent.EXTRA_ALLOW_MULTIPLE, true)
+            }
+        )
+    }
+
     // 相机
     val cameraLauncher = remember { CameraLauncher() }
     val cameraResultLauncher = rememberLauncherForActivityResult(
@@ -501,15 +542,7 @@ fun PhotoXHomeScreen(
                     text = "从系统相册选择",
                     onClick = {
                         showImportSheet = false
-                        // 调起系统 Gallery（图片+视频，支持长按+滑动手势多选）
-                        val intent = Intent(
-                            Intent.ACTION_PICK,
-                            MediaStore.Files.getContentUri(MediaStore.VOLUME_EXTERNAL)
-                        ).apply {
-                            putExtra(Intent.EXTRA_MIME_TYPES, arrayOf("image/*", "video/*"))
-                            putExtra(Intent.EXTRA_ALLOW_MULTIPLE, true)
-                        }
-                        galleryLauncher.launch(intent)
+                        launchGalleryPicker()
                     }
                 )
                 ImportSourceItem(
