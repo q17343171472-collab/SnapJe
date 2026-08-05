@@ -2,6 +2,7 @@ package com.rapii.snapje.data.local
 
 import android.content.Context
 import androidx.room.*
+import androidx.room.migration.Migration
 import androidx.sqlite.db.SupportSQLiteDatabase
 import com.rapii.snapje.util.L
 import dagger.hilt.android.qualifiers.ApplicationContext

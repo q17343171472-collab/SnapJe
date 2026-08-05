@@ -3,6 +3,7 @@
 import android.app.Activity
 import android.content.Intent
 import android.graphics.Bitmap
+import android.net.Uri
 import android.provider.MediaStore
 import android.widget.Toast
 import androidx.activity.compose.LocalOnBackPressedDispatcherOwner
@@ -329,6 +330,9 @@ fun PhotoGalleryScreen(
                             FileOperationType.SHARE -> {
                                 showOperationsMenu = false
                                 onShare(currentPhoto)
+                            }
+                            FileOperationType.HIDE -> {
+                                showOperationsMenu = false
                             }
                             FileOperationType.INFO -> {
                                 showOperationsMenu = false

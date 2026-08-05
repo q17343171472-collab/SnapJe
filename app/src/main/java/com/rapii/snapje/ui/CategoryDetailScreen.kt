@@ -3,6 +3,7 @@
 import android.app.Activity
 import android.content.Intent
 import android.media.MediaScannerConnection
+import android.net.Uri
 import android.provider.MediaStore
 import android.widget.Toast
 import androidx.activity.compose.LocalOnBackPressedDispatcherOwner
@@ -198,6 +199,7 @@ fun CategoryDetailScreen(
             vaultDeleteHandler = { photo ->
                 scope.launch {
                     when (val result = viewModel.deleteVaultPhoto(photo)) {
+                        is Result.Loading -> {}
                         is Result.Success -> {
                             Toast.makeText(
                                 context,
@@ -540,7 +542,7 @@ fun CategoryDetailScreen(
                         photoPendingDeleteAfterLock = photo
                         selectedPhoto = null
                         showPatternLockForDelete = true
-                        return
+                        return@launch
                     }
                     FileOperationType.RENAME -> { showRenameDialog = true; return@launch }
                     FileOperationType.SHARE -> {
@@ -663,6 +665,7 @@ fun CategoryDetailScreen(
                 var failed = 0
                 photosToDelete.forEach { photo ->
                     when (val result = viewModel.deleteVaultPhoto(photo)) {
+                        is Result.Loading -> {}
                         is Result.Success -> viewModel.removePhotoFromList(photo)
                         is Result.Error -> failed++
                     }
@@ -868,6 +871,7 @@ fun CategoryDetailScreen(
                         // 保险库照片：直接改显示名
                         if (photo.isVaultPhoto) {
                             when (val result = viewModel.renameVaultPhoto(photo, newName)) {
+                                is Result.Loading -> {}
                                 is Result.Success -> {
                                     Toast.makeText(
                                         context.applicationContext,
@@ -953,6 +957,7 @@ fun CategoryDetailScreen(
                         // 保险库照片：直接删除（密文文件 + DB 记录）
                         if (photoToDelete.isVaultPhoto) {
                             when (val result = viewModel.deleteVaultPhoto(photoToDelete)) {
+                                is Result.Loading -> {}
                                 is Result.Success -> {
                                     Toast.makeText(
                                         context,

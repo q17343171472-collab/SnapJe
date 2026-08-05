@@ -12,6 +12,8 @@ import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
 import java.io.ByteArrayOutputStream
 import java.io.File
@@ -61,7 +63,7 @@ class VaultRepository @Inject constructor(
     private val fullCache = ConcurrentHashMap<String, File>()
 
     /** 每个照片 ID 的解密锁（防止并发写同一临时文件） */
-    private val decryptLocks = ConcurrentHashMap<String, Any>()
+    private val decryptLocks = ConcurrentHashMap<String, Mutex>()
 
     // ---------------------------------------------------------------------
     // 查询
@@ -118,7 +120,7 @@ class VaultRepository @Inject constructor(
                     ?: return@withContext Result.failure(IllegalStateException("无法读取所选图片"))
                 input.use { stream ->
                     val encResult = encryptionManager.encryptStream(stream, encFile)
-                    if (encResult.isError) {
+                    if (encResult.isFailure) {
                         return@withContext Result.failure(
                             encResult.exceptionOrNull() ?: IllegalStateException("加密失败")
                         )
@@ -148,7 +150,7 @@ class VaultRepository @Inject constructor(
                 val thumbBytes = runCatching {
                     resolver.openInputStream(sourceUri)?.use { it.readBytes() }
                 }.getOrNull()
-                if (!thumbBytes.isNullOrEmpty()) {
+                if (thumbBytes != null && thumbBytes.isNotEmpty()) {
                     generateThumbnail(thumbBytes)?.let { tb ->
                         if (encryptionManager.encryptBytes(tb, thumbFile).isSuccess) {
                             thumbnailPath = thumbFile.absolutePath
@@ -228,9 +230,9 @@ class VaultRepository @Inject constructor(
      */
     suspend fun thumbnailUri(photo: VaultPhoto): Uri {
         thumbCache[photo.id]?.let { if (it.exists()) return Uri.fromFile(it) }
-        val lock = decryptLocks.computeIfAbsent(photo.id) { Any() }
-        return synchronized(lock) {
-            thumbCache[photo.id]?.let { if (it.exists()) return@synchronized Uri.fromFile(it) }
+        val lock = decryptLocks.computeIfAbsent(photo.id) { Mutex() }
+        return lock.withLock {
+            thumbCache[photo.id]?.let { if (it.exists()) return@withLock Uri.fromFile(it) }
             val file = decryptThumbnail(photo)
             thumbCache[photo.id] = file
             Uri.fromFile(file)
@@ -242,9 +244,9 @@ class VaultRepository @Inject constructor(
      */
     suspend fun fullImageUri(photo: VaultPhoto): Uri {
         fullCache[photo.id]?.let { if (it.exists()) return Uri.fromFile(it) }
-        val lock = decryptLocks.computeIfAbsent(photo.id) { Any() }
-        return synchronized(lock) {
-            fullCache[photo.id]?.let { if (it.exists()) return@synchronized Uri.fromFile(it) }
+        val lock = decryptLocks.computeIfAbsent(photo.id) { Mutex() }
+        return lock.withLock {
+            fullCache[photo.id]?.let { if (it.exists()) return@withLock Uri.fromFile(it) }
             val file = decryptFull(photo)
             fullCache[photo.id] = file
             Uri.fromFile(file)
