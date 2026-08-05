@@ -1,14 +1,22 @@
 ﻿package com.rapii.snapje.ui
 
 import android.app.Activity
+import android.content.ContentUris
 import android.content.Intent
 import android.media.MediaScannerConnection
 import android.net.Uri
+import android.os.Build
 import android.provider.MediaStore
 import android.widget.Toast
 import androidx.activity.compose.LocalOnBackPressedDispatcherOwner
 import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.PickVisualMediaRequest
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.animation.core.animateIntAsState
+import androidx.compose.animation.core.tween
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.gestures.awaitEachGesture
+import androidx.compose.foundation.gestures.awaitFirstDown
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.grid.GridCells
@@ -18,8 +26,12 @@ import androidx.compose.foundation.lazy.grid.rememberLazyGridState
 import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.CameraAlt
 import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.PhotoLibrary
 import androidx.compose.material.icons.filled.Refresh
+import androidx.compose.material.icons.filled.SaveAlt
 import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 import androidx.compose.material.icons.outlined.CheckCircle
 import androidx.compose.material.icons.outlined.Delete
@@ -49,6 +61,8 @@ import kotlinx.coroutines.withContext
 import com.rapii.snapje.data.PhotoInfo
 import com.rapii.snapje.data.PhotoItem
 import com.rapii.snapje.data.Result
+import com.rapii.snapje.data.SettingsManager
+import com.rapii.snapje.util.CameraLauncher
 import com.rapii.snapje.util.L
 import com.rapii.snapje.data.PhotoSortOption
 import com.rapii.snapje.data.TrashRepository
@@ -63,6 +77,8 @@ import com.rapii.snapje.ui.components.SortMenuState
 import com.rapii.snapje.ui.components.rememberSortMenuState
 import kotlinx.coroutines.launch
 import java.io.File
+import kotlin.math.abs
+import kotlin.math.hypot
 
 /**
  * Screen showing all photos in a specific category/folder.
@@ -91,6 +107,280 @@ fun CategoryDetailScreen(
 
     // CRITICAL: Remember the LazyVerticalGrid state to preserve scroll position
     val gridState = rememberLazyGridState()
+
+    // 设置管理器（捏合列数持久化 + 自动删除原图开关）
+    val settingsManager = remember { SettingsManager(context.applicationContext) }
+
+    // ---------------------------------------------------------------------
+    // 双指捏合缩放网格（苹果相册风格）：缩小→列数变多，放大→列数变少
+    // ---------------------------------------------------------------------
+    val minGridColumns = 2
+    val maxGridColumns = 10
+    // 当前列数（松手后持久化到全局设置，所有分组共享）
+    var gridColumns by remember { mutableIntStateOf(3) }
+    // 列数变化动画：丝滑过渡
+    val animatedGridColumns by animateIntAsState(
+        targetValue = gridColumns,
+        animationSpec = tween(220),
+        label = "gridColumns"
+    )
+    // 读取全局列数设置
+    LaunchedEffect(Unit) {
+        gridColumns = settingsManager.getGridColumns().coerceIn(minGridColumns, maxGridColumns)
+    }
+    // 捏合手势：两指距离变化 → 列数增减；松手后保存
+    val pinchModifier = Modifier.pointerInput(Unit) {
+        awaitEachGesture {
+            awaitFirstDown(requireUnconsumed = false)
+            var lastSpan = -1f
+            var gestureColumns = gridColumns
+            var pinchChanged = false
+            do {
+                val event = awaitPointerEvent()
+                val pressed = event.changes.filter { it.pressed }
+                if (pressed.size >= 2) {
+                    val span = hypot(
+                        pressed[0].position.x - pressed[1].position.x,
+                        pressed[0].position.y - pressed[1].position.y
+                    )
+                    if (lastSpan > 0f) {
+                        val ratio = span / lastSpan
+                        // 距离变化超过 10% 才调整一列（避免抖动）
+                        if (ratio > 1.10f && gestureColumns > minGridColumns) {
+                            gestureColumns--
+                            lastSpan = span
+                            pinchChanged = true
+                        } else if (ratio < 0.90f && gestureColumns < maxGridColumns) {
+                            gestureColumns++
+                            lastSpan = span
+                            pinchChanged = true
+                        }
+                        if (gestureColumns != gridColumns) {
+                            gridColumns = gestureColumns
+                        }
+                    } else {
+                        lastSpan = span
+                    }
+                } else {
+                    lastSpan = -1f
+                }
+                // 捏合时消费事件，避免同时触发滚动/点击
+                if (pinchChanged) {
+                    event.changes.forEach { it.consume() }
+                }
+            } while (event.changes.any { it.pressed })
+            // 松手：锁定当前列数并全局保存
+            if (pinchChanged) {
+                scope.launch { settingsManager.setGridColumns(gridColumns) }
+            }
+        }
+    }
+
+    // ---------------------------------------------------------------------
+    // 分组内导入（右下角按钮）+ 导出到相册
+    // ---------------------------------------------------------------------
+    var showImportSheet by remember { mutableStateOf(false) }
+    var pendingImportUri by remember { mutableStateOf<Uri?>(null) }
+    var pendingCameraUri by remember { mutableStateOf<Uri?>(null) }
+    var showAlbumDialog by remember { mutableStateOf(false) }
+    var albumName by remember { mutableStateOf("") }
+    var isImporting by remember { mutableStateOf(false) }
+
+    // 删除原图相关
+    var pendingDeleteOriginalUri by remember { mutableStateOf<Uri?>(null) }
+
+    // 选择照片/视频（支持图片和视频）
+    val photoPicker = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.PickVisualMedia()
+    ) { uri ->
+        if (uri != null) {
+            pendingImportUri = uri
+            // 默认导入到当前分组
+            albumName = uiState.category?.displayName ?: "我的保险库"
+            showAlbumDialog = true
+        }
+    }
+
+    // 相机
+    val cameraLauncher = remember { CameraLauncher() }
+    val cameraResultLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.StartActivityForResult()
+    ) { result ->
+        val uri = cameraLauncher.getLastPhotoUri()
+        if (result.resultCode == Activity.RESULT_OK && uri != null) {
+            pendingCameraUri = uri
+            // 默认导入到当前分组
+            albumName = uiState.category?.displayName ?: "我的保险库"
+            showAlbumDialog = true
+        } else {
+            cameraLauncher.clearPhotoUri()
+        }
+    }
+
+    // 删除相册原图（Android 11+ 弹系统确认框）
+    val deleteOriginalLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.StartIntentSenderForResult()
+    ) { result ->
+        pendingDeleteOriginalUri = null
+        Toast.makeText(
+            context,
+            if (result.resultCode == Activity.RESULT_OK) R.string.original_deleted else R.string.original_kept,
+            Toast.LENGTH_SHORT
+        ).show()
+    }
+
+    fun launchCamera() {
+        runCatching {
+            cameraResultLauncher.launch(cameraLauncher.createCaptureIntent(context))
+        }.onFailure { e ->
+            L.e("CategoryDetail", "Camera launch failed: ${e.message}")
+            Toast.makeText(context, "无法打开相机", Toast.LENGTH_SHORT).show()
+        }
+    }
+
+    fun cleanupCameraFile() {
+        val file = cameraLauncher.getLastPhotoFile()
+        if (file != null) runCatching { file.delete() }
+        cameraLauncher.clearPhotoUri()
+        pendingCameraUri = null
+    }
+
+    /** Photo Picker 地址转 MediaStore 标准地址（可删除） */
+    fun toMediaStoreUri(uri: Uri): Uri {
+        if (uri.scheme == "content" && uri.authority?.contains("media") == true &&
+            !uri.path.orEmpty().contains("/picker/")
+        ) {
+            return uri
+        }
+        val id = runCatching {
+            context.contentResolver.query(uri, arrayOf(MediaStore.Images.Media._ID), null, null, null)
+                ?.use { if (it.moveToFirst()) it.getLong(it.getColumnIndexOrThrow(MediaStore.Images.Media._ID)) else null }
+        }.getOrNull() ?: uri.lastPathSegment?.toLongOrNull()
+        return if (id != null) {
+            ContentUris.withAppendedId(MediaStore.Images.Media.EXTERNAL_CONTENT_URI, id)
+        } else {
+            uri
+        }
+    }
+
+    fun deleteOriginalFromGallery(uri: Uri) {
+        val resolver = context.contentResolver
+        val mediaUri = toMediaStoreUri(uri)
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+            try {
+                val pendingIntent = MediaStore.createDeleteRequest(resolver, listOf(mediaUri))
+                val request = androidx.activity.result.IntentSenderRequest.Builder(pendingIntent).build()
+                deleteOriginalLauncher.launch(request)
+                return
+            } catch (e: Exception) {
+                L.e("CategoryDetail", "createDeleteRequest failed", e)
+            }
+        }
+        val deleted = runCatching { resolver.delete(mediaUri, null, null) }.getOrDefault(0)
+        if (deleted > 0) {
+            Toast.makeText(context, R.string.original_deleted, Toast.LENGTH_SHORT).show()
+            pendingDeleteOriginalUri = null
+            return
+        }
+        // 回退：按文件路径删除
+        val path = runCatching {
+            resolver.query(mediaUri, arrayOf(MediaStore.Images.Media.DATA), null, null, null)
+                ?.use { if (it.moveToFirst()) it.getString(0) else null }
+        }.getOrNull()
+        if (!path.isNullOrBlank()) {
+            val file = File(path)
+            if (file.exists() && file.delete()) {
+                Toast.makeText(context, R.string.original_deleted, Toast.LENGTH_SHORT).show()
+                pendingDeleteOriginalUri = null
+                return
+            }
+        }
+        Toast.makeText(context, R.string.original_delete_failed, Toast.LENGTH_LONG).show()
+        pendingDeleteOriginalUri = null
+    }
+
+    // 分组内导入：默认归入当前相册分组
+    fun clearPendingImport() {
+        pendingImportUri = null
+        cleanupCameraFile()
+        showAlbumDialog = false
+        showImportSheet = false
+    }
+
+    fun performImport(uri: Uri, album: String) {
+        if (isImporting) return
+        isImporting = true
+        scope.launch {
+            val result = viewModel.addPhotoToVault(uri, album)
+            isImporting = false
+            if (result.isSuccess) {
+                Toast.makeText(context, R.string.import_success, Toast.LENGTH_SHORT).show()
+                viewModel.loadPhotos()
+                // 系统相册导入的：按设置决定删除原图或询问（相机临时文件自动清理）
+                if (uri != pendingCameraUri) {
+                    if (settingsManager.isAutoDeleteOriginal()) {
+                        deleteOriginalFromGallery(uri)
+                    } else {
+                        pendingDeleteOriginalUri = uri
+                    }
+                }
+            } else {
+                Toast.makeText(
+                    context,
+                    context.getString(R.string.import_failed, result.exceptionOrNull()?.message ?: "未知"),
+                    Toast.LENGTH_LONG
+                ).show()
+            }
+            cleanupCameraFile()
+            showAlbumDialog = false
+        }
+    }
+
+    // 导出单张保险库照片/视频到系统相册
+    fun exportVaultPhoto(photo: PhotoItem) {
+        scope.launch {
+            when (val result = viewModel.exportVaultPhoto(photo)) {
+                is Result.Success -> Toast.makeText(context, "已保存到相册", Toast.LENGTH_SHORT).show()
+                is Result.Error -> Toast.makeText(context, "保存失败：${result.message}", Toast.LENGTH_LONG).show()
+                is Result.Loading -> {}
+            }
+        }
+    }
+
+    // 批量导出选中项
+    fun handleBatchExport() {
+        val photos = selectedPhotos.toList()
+        if (photos.isEmpty()) return
+        scope.launch {
+            val count = viewModel.exportVaultPhotos(photos)
+            Toast.makeText(
+                context,
+                if (count > 0) "已保存 $count 项到相册" else "保存失败，请检查存储权限",
+                Toast.LENGTH_LONG
+            ).show()
+            isSelectionMode = false
+            selectedPhotos = emptySet()
+        }
+    }
+
+    // 播放保险库视频（解密后交给系统播放器）
+    fun playVideo(photo: PhotoItem) {
+        scope.launch {
+            val uri = viewModel.videoUri(photo)
+            if (uri == null) {
+                Toast.makeText(context, "视频解密失败", Toast.LENGTH_SHORT).show()
+                return@launch
+            }
+            val tempFile = File(uri.path ?: return@launch)
+            val providerUri = FileProvider.getUriForFile(context, "${context.packageName}.fileprovider", tempFile)
+            val intent = Intent(Intent.ACTION_VIEW).apply {
+                setDataAndType(providerUri, "video/*")
+                addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+            }
+            runCatching { context.startActivity(intent) }
+                .onFailure { Toast.makeText(context, "没有可用的视频播放器", Toast.LENGTH_LONG).show() }
+        }
+    }
 
     // Photo gallery state
     var showPhotoGallery by remember { mutableStateOf(false) }
@@ -213,7 +503,9 @@ fun CategoryDetailScreen(
                         }
                     }
                 }
-            }
+            },
+            vaultExportHandler = { photo -> exportVaultPhoto(photo) },
+            vaultPlayHandler = { photo -> playVideo(photo) }
         )
         return
     }
@@ -731,7 +1023,10 @@ fun CategoryDetailScreen(
                         isSelectionMode = false
                         selectedPhotos = emptySet()
                     },
-                    onDelete = { handleBatchDelete() }
+                    onDelete = { handleBatchDelete() },
+                    onSave = {
+                        if (selectedPhotos.isNotEmpty()) handleBatchExport()
+                    }
                 )
             } else {
                 CategoryDetailTopAppBar(
@@ -745,7 +1040,18 @@ fun CategoryDetailScreen(
                 )
             }
         },
-        snackbarHost = { SnackbarHost(snackbarHostState) }
+        snackbarHost = { SnackbarHost(snackbarHostState) },
+        floatingActionButton = {
+            // 分组内导入：右下角按钮，导入的照片默认归入当前相册分组
+            if (!isSelectionMode && !showPhotoGallery) {
+                FloatingActionButton(
+                    onClick = { showImportSheet = true },
+                    containerColor = MaterialTheme.colorScheme.primaryContainer
+                ) {
+                    Icon(Icons.Default.Add, contentDescription = "导入到此相册")
+                }
+            }
+        }
     ) { paddingValues ->
         Box(
             modifier = Modifier
@@ -809,7 +1115,10 @@ fun CategoryDetailScreen(
                                 }
                             },
                             modifier = Modifier.fillMaxSize(),
-                            state = gridState
+                            state = gridState,
+                            // 捏合缩放：实时列数（带动画）+ 手势叠加
+                            columns = animatedGridColumns,
+                            pinchModifier = pinchModifier
                         )
                     }
                 }
@@ -1006,4 +1315,111 @@ fun CategoryDetailScreen(
             title = stringResource(R.string.delete_vault_photo)
         )
     }
+
+    // ---- 分组内导入：选择来源（相册/相机） ----
+    if (showImportSheet) {
+        ModalBottomSheet(onDismissRequest = { showImportSheet = false }) {
+            Column(modifier = Modifier.padding(vertical = 16.dp)) {
+                // 从系统相册选择（支持图片和视频）
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clickable {
+                            showImportSheet = false
+                            photoPicker.launch(
+                                PickVisualMediaRequest(
+                                    ActivityResultContracts.PickVisualMedia.ImageAndVideo
+                                )
+                            )
+                        }
+                        .padding(horizontal = 24.dp, vertical = 16.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Icon(Icons.Default.PhotoLibrary, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
+                    Spacer(modifier = Modifier.width(16.dp))
+                    Text("从系统相册选择（图片/视频）", style = MaterialTheme.typography.bodyLarge)
+                }
+                // 拍照
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clickable {
+                            showImportSheet = false
+                            launchCamera()
+                        }
+                        .padding(horizontal = 24.dp, vertical = 16.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Icon(Icons.Default.CameraAlt, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
+                    Spacer(modifier = Modifier.width(16.dp))
+                    Text("拍照", style = MaterialTheme.typography.bodyLarge)
+                }
+            }
+        }
+    }
+
+    // ---- 导入：确认相册名（默认当前分组，可修改） ----
+    if (showAlbumDialog) {
+        AlertDialog(
+            onDismissRequest = { clearPendingImport() },
+            title = { Text(stringResource(R.string.add_photo)) },
+            text = {
+                Column {
+                    OutlinedTextField(
+                        value = albumName,
+                        onValueChange = { albumName = it },
+                        label = { Text(stringResource(R.string.vault_album_hint)) },
+                        singleLine = true,
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                    Spacer(modifier = Modifier.height(8.dp))
+                    Text(
+                        text = "当前分组：${uiState.category?.displayName ?: "相册"}（默认导入到本组）",
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+            },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        val uri = pendingImportUri ?: pendingCameraUri
+                        if (uri != null) {
+                            performImport(uri, albumName.ifBlank { uiState.category?.displayName ?: "我的保险库" })
+                        }
+                    }
+                ) {
+                    Text(stringResource(R.string.import_success_confirm))
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { clearPendingImport() }) {
+                    Text(stringResource(R.string.cancel))
+                }
+            }
+        )
+    }
+
+    // ---- 导入后：询问是否删除相册原图 ----
+    pendingDeleteOriginalUri?.let { originalUri ->
+        AlertDialog(
+            onDismissRequest = { pendingDeleteOriginalUri = null },
+            title = { Text(stringResource(R.string.delete_original_title)) },
+            text = { Text(stringResource(R.string.delete_original_message)) },
+            confirmButton = {
+                TextButton(onClick = { deleteOriginalFromGallery(originalUri) }) {
+                    Text(stringResource(R.string.delete_original_confirm))
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = {
+                    pendingDeleteOriginalUri = null
+                    Toast.makeText(context, R.string.original_kept, Toast.LENGTH_SHORT).show()
+                }) {
+                    Text(stringResource(R.string.delete_original_keep))
+                }
+            }
+        )
+    }
 }
+

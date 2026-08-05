@@ -1,5 +1,6 @@
 package com.rapii.snapje.data
 
+import android.content.ContentValues
 import android.content.Context
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
@@ -15,6 +16,7 @@ import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
+import java.io.ByteArrayInputStream
 import java.io.ByteArrayOutputStream
 import java.io.File
 import java.util.UUID
@@ -145,14 +147,19 @@ class VaultRepository @Inject constructor(
                 }
                 val mimeType = resolver.getType(sourceUri) ?: "image/jpeg"
 
-                // 3) 缩略图（需读字节解码；失败不影响导入，回退到直接解密原图展示）
+                // 3) 缩略图（图片解码 / 视频取首帧；失败不影响导入，回退到直接解密原图展示）
                 var thumbnailPath = ""
                 val thumbBytes = runCatching {
                     resolver.openInputStream(sourceUri)?.use { it.readBytes() }
                 }.getOrNull()
                 if (thumbBytes != null && thumbBytes.isNotEmpty()) {
-                    generateThumbnail(thumbBytes)?.let { tb ->
-                        if (encryptionManager.encryptBytes(tb, thumbFile).isSuccess) {
+                    val tb = if (mimeType.startsWith("video/")) {
+                        generateVideoThumbnail(thumbBytes)
+                    } else {
+                        generateThumbnail(thumbBytes)
+                    }
+                    tb?.let {
+                        if (encryptionManager.encryptBytes(it, thumbFile).isSuccess) {
                             thumbnailPath = thumbFile.absolutePath
                         }
                     }
@@ -353,7 +360,36 @@ class VaultRepository @Inject constructor(
 
             val opts = BitmapFactory.Options().apply { inSampleSize = sampleSize }
             val bitmap = BitmapFactory.decodeByteArray(bytes, 0, bytes.size, opts) ?: return null
+            return generateThumbnailFromBitmap(bitmap)
+        } catch (e: Exception) {
+            L.e("VaultRepository", "Thumbnail generation failed: ${e.message}")
+            null
+        }
+    }
 
+    /**
+     * 视频取第一帧生成缩略图（视频文件导入时使用）。
+     */
+    private fun generateVideoThumbnail(bytes: ByteArray): ByteArray? {
+        var retriever: android.media.MediaMetadataRetriever? = null
+        return try {
+            retriever = android.media.MediaMetadataRetriever()
+            retriever.setDataSource(ByteArrayInputStream(bytes))
+            val frame = retriever.frameAtTime ?: return null
+            generateThumbnailFromBitmap(frame)
+        } catch (e: Exception) {
+            L.e("VaultRepository", "Video thumbnail failed: ${e.message}")
+            null
+        } finally {
+            runCatching { retriever?.release() }
+        }
+    }
+
+    /**
+     * 把 Bitmap 缩放并压缩为 JPEG 字节（图片/视频缩略图共用）。
+     */
+    private fun generateThumbnailFromBitmap(bitmap: Bitmap): ByteArray? {
+        return try {
             val scaled = if (bitmap.width > THUMBNAIL_MAX_DIMENSION || bitmap.height > THUMBNAIL_MAX_DIMENSION) {
                 val ratio = minOf(
                     THUMBNAIL_MAX_DIMENSION.toFloat() / bitmap.width,
@@ -375,9 +411,60 @@ class VaultRepository @Inject constructor(
             bitmap.recycle()
             out.toByteArray()
         } catch (e: Exception) {
-            L.e("VaultRepository", "Thumbnail generation failed: ${e.message}")
+            L.e("VaultRepository", "Thumbnail compress failed: ${e.message}")
             null
         }
+    }
+
+    // ---------------------------------------------------------------------
+    // 导出到系统相册
+    // ---------------------------------------------------------------------
+
+    /**
+     * 把保险库照片/视频导出到系统相册（解密后写入 MediaStore，恢复为普通文件）。
+     * Android 10+（API 29+）无需权限；更低版本需要存储权限，无权限会返回失败。
+     */
+    suspend fun exportPhotoToGallery(photo: VaultPhoto): Result<Uri> = withContext(Dispatchers.IO) {
+        try {
+            val decrypted = decryptFull(photo)
+            val resolver = context.contentResolver
+            val isVideo = photo.mimeType.startsWith("video/")
+            val collection = if (isVideo) {
+                MediaStore.Video.Media.EXTERNAL_CONTENT_URI
+            } else {
+                MediaStore.Images.Media.EXTERNAL_CONTENT_URI
+            }
+            val values = ContentValues().apply {
+                put(MediaStore.MediaColumns.DISPLAY_NAME, photo.originalName)
+                put(
+                    MediaStore.MediaColumns.MIME_TYPE,
+                    photo.mimeType.ifBlank { if (isVideo) "video/mp4" else "image/jpeg" }
+                )
+                put(MediaStore.MediaColumns.DATE_ADDED, System.currentTimeMillis() / 1000)
+            }
+            val insertUri = resolver.insert(collection, values)
+                ?: return@withContext Result.failure(IllegalStateException("无法写入相册，可能缺少存储权限"))
+            resolver.openOutputStream(insertUri)?.use { out ->
+                decrypted.inputStream().use { it.copyTo(out) }
+            } ?: run {
+                resolver.delete(insertUri, null, null)
+                return@withContext Result.failure(IllegalStateException("无法写入相册"))
+            }
+            L.d("VaultRepository", "Exported ${photo.originalName} to gallery")
+            Result.success(insertUri)
+        } catch (e: Exception) {
+            L.e("VaultRepository", "Export failed: ${e.message}", e)
+            Result.failure(e)
+        }
+    }
+
+    /**
+     * 按保险库照片 ID 导出到系统相册。
+     */
+    suspend fun exportToGallery(vaultId: String): Result<Uri> = withContext(Dispatchers.IO) {
+        val entity = vaultPhotoDao.getPhotoById(vaultId)
+            ?: return@withContext Result.failure(IllegalStateException("找不到照片"))
+        exportPhotoToGallery(VaultPhoto.fromEntity(entity))
     }
 
     private fun deleteFileSafely(path: String?) {

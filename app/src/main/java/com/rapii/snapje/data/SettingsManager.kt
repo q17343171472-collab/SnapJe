@@ -160,6 +160,15 @@ class SettingsManager @Inject constructor(
     }
 
     /**
+     * 读取当前网格列数（默认 3）。
+     */
+    suspend fun getGridColumns(): Int {
+        return context.dataStore.data.map { prefs ->
+            prefs[SettingsKeys.GRID_COLUMNS] ?: 3
+        }.first()
+    }
+
+    /**
      * Update grid columns setting.
      */
     suspend fun setGridColumns(columns: Int) {

@@ -200,6 +200,41 @@ class CategoryDetailViewModel @Inject constructor(
     }
 
     /**
+     * 导入照片/视频到保险库（分组内导入时使用，指定目标相册名）。
+     */
+    suspend fun addPhotoToVault(uri: Uri, albumName: String): Result<Unit> {
+        return vaultRepository.addPhotoToVault(uri, albumName).map { }
+    }
+
+    /**
+     * 导出单张保险库照片/视频到系统相册。
+     */
+    suspend fun exportVaultPhoto(photo: PhotoItem): Result<Unit> {
+        val vaultId = photo.vaultId ?: return Result.failure(IllegalStateException("不是保险库照片"))
+        return vaultRepository.exportToGallery(vaultId).map { }
+    }
+
+    /**
+     * 批量导出保险库照片/视频到系统相册，返回成功导出的数量。
+     */
+    suspend fun exportVaultPhotos(photos: List<PhotoItem>): Int {
+        var count = 0
+        photos.forEach { photo ->
+            val vaultId = photo.vaultId ?: return@forEach
+            if (vaultRepository.exportToGallery(vaultId).isSuccess) count++
+        }
+        return count
+    }
+
+    /**
+     * 解密保险库视频并返回 URI（供系统播放器播放）。
+     */
+    suspend fun videoUri(photo: PhotoItem): Uri? {
+        val vaultId = photo.vaultId ?: return null
+        return vaultRepository.fullImageUri(vaultId)
+    }
+
+    /**
      * 退出全屏预览后清理解密原图临时文件（保留缩略图缓存）。
      */
     fun clearFullImageCache() {

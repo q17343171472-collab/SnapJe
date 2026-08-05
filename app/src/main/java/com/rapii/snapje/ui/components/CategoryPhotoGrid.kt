@@ -1,5 +1,7 @@
 package com.rapii.snapje.ui.components
 
+import androidx.compose.animation.core.tween
+import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.gestures.awaitEachGesture
 import androidx.compose.foundation.gestures.awaitFirstDown
 import androidx.compose.foundation.gestures.detectDragGestures
@@ -95,6 +97,7 @@ fun CategoryPhotoGridItemWithLongPress(
  * 2. On ACTION_MOVE while pressed — find item under finger and select it
  * 3. On ACTION_UP — stop drag selection, keep selection mode active
  */
+@OptIn(ExperimentalFoundationApi::class)
 @Composable
 fun PhotoGridWithOperations(
     photos: List<PhotoItem>,
@@ -105,7 +108,9 @@ fun PhotoGridWithOperations(
     onDragSelect: ((PhotoItem) -> Unit)? = null,
     modifier: Modifier = Modifier,
     columns: Int = 3,
-    state: LazyGridState = rememberLazyGridState()
+    state: LazyGridState = rememberLazyGridState(),
+    /** 捏合缩放网格列数手势（叠加在最外层，先于选择拖动手势） */
+    pinchModifier: Modifier = Modifier
 ) {
     var isDragging by remember { mutableStateOf(false) }
     var lastDraggedIndex by remember { mutableStateOf(-1) }
@@ -177,7 +182,7 @@ fun PhotoGridWithOperations(
 
     LazyVerticalGrid(
         columns = GridCells.Fixed(columns),
-        modifier = modifier.then(dragModifier),
+        modifier = modifier.then(pinchModifier).then(dragModifier),
         state = state,
         contentPadding = PaddingValues(0.dp)
     ) {
@@ -192,7 +197,12 @@ fun PhotoGridWithOperations(
                 isSelectionMode = isSelectionMode,
                 isSelected = isSelected,
                 onClick = { onPhotoClick(photo, index) },
-                onLongPress = { onPhotoLongPress(photo) }
+                onLongPress = { onPhotoLongPress(photo) },
+                // 列数变化时平滑移动到新位置（捏合缩放的丝滑过渡）
+                modifier = Modifier.animateItem(
+                    fadeInSpec = tween(180),
+                    fadeOutSpec = tween(120)
+                )
             )
         }
     }

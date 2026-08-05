@@ -71,7 +71,11 @@ fun PhotoGalleryScreen(
     allCategories: List<com.rapii.snapje.data.Category> = emptyList(),
     vaultFullImageProvider: suspend (PhotoItem) -> Uri? = { null },
     /** 保险库照片删除回调（生物识别确认后触发） */
-    vaultDeleteHandler: ((PhotoItem) -> Unit)? = null
+    vaultDeleteHandler: ((PhotoItem) -> Unit)? = null,
+    /** 保险库照片保存到系统相册回调 */
+    vaultExportHandler: ((PhotoItem) -> Unit)? = null,
+    /** 保险库视频播放回调（解密后交给系统播放器） */
+    vaultPlayHandler: ((PhotoItem) -> Unit)? = null
 ) {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
@@ -217,6 +221,18 @@ fun PhotoGalleryScreen(
                 actions = {
                     IconButton(onClick = { showInfo = !showInfo }) {
                         Icon(Icons.Default.Info, contentDescription = "照片信息", tint = Color.White)
+                    }
+                    // 保险库照片：保存到系统相册
+                    if (currentPhoto?.isVaultPhoto == true) {
+                        IconButton(onClick = { currentPhoto?.let { vaultExportHandler?.invoke(it) } }) {
+                            Icon(Icons.Default.SaveAlt, contentDescription = "保存到相册", tint = Color.White)
+                        }
+                    }
+                    // 保险库视频：播放（交给系统播放器）
+                    if (currentPhoto?.mimeType?.startsWith("video/") == true) {
+                        IconButton(onClick = { currentPhoto?.let { vaultPlayHandler?.invoke(it) } }) {
+                            Icon(Icons.Default.PlayArrow, contentDescription = "播放视频", tint = Color.White)
+                        }
                     }
                     currentPhoto?.let { photo ->
                         IconButton(onClick = { onShare(photo) }) {
