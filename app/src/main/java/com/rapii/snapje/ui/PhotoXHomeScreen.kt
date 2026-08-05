@@ -384,7 +384,7 @@ fun PhotoXHomeScreen(
                     onClick = {
                         showImportSheet = false
                         photoPicker.launch(
-                            ActivityResultContracts.PickVisualMediaRequest(
+                            PickVisualMediaRequest(
                                 ActivityResultContracts.PickVisualMedia.ImageOnly
                             )
                         )
