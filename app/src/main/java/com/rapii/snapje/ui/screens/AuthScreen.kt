@@ -37,6 +37,7 @@ import androidx.lifecycle.compose.currentStateAsState
 import com.rapii.snapje.R
 import com.rapii.snapje.util.BiometricAuthManager
 import com.rapii.snapje.util.L
+import kotlinx.coroutines.delay
 
 /**
  * 生物识别验证启动页。
@@ -56,6 +57,8 @@ fun AuthScreen(
 
     var isAuthenticating by remember { mutableStateOf(false) }
     var errorMessage by remember { mutableStateOf<String?>(null) }
+    // 防止冷启动时重复自动弹指纹（只自动尝试一次，之后由用户手动点按钮）
+    var hasAutoAttempted by remember { mutableStateOf(false) }
 
     // 预解析字符串（局部函数 / 回调内不能调用 @Composable stringResource）
     val appName = stringResource(R.string.app_name)
@@ -94,15 +97,29 @@ fun AuthScreen(
         )
     }
 
+    // 安全地触发指纹：某些设备冷启动时 Fragment 未就绪，
+    // 立即调用 BiometricPrompt 会抛 IllegalStateException 导致闪退，
+    // 这里 catch 住并回退为手动按钮模式。
+    fun safeAuthenticate() {
+        runCatching { startAuthentication() }.onFailure { e ->
+            isAuthenticating = false
+            errorMessage = e.message ?: "指纹验证无法启动，请点击按钮重试"
+            L.e("AuthScreen", "BiometricPrompt launch failed", e)
+        }
+    }
+
     // 锁定态按返回键直接退出 App
     BackHandler { onExit() }
 
-    // 首次进入自动弹出生物识别（仅在前台 RESUMED 状态，避免退后台时触发）
+    // 首次进入自动弹出生物识别（仅在前台 RESUMED 状态，避免退后台时触发）。
+    // 延迟 600ms 等窗口/ Fragment 就绪后再弹，避免冷启动时崩溃。
     val lifecycleOwner = LocalLifecycleOwner.current
     val lifecycleState by lifecycleOwner.lifecycle.currentStateAsState()
     LaunchedEffect(lifecycleState, fragmentActivity, biometricAvailable) {
-        if (lifecycleState == Lifecycle.State.RESUMED && biometricAvailable) {
-            startAuthentication()
+        if (lifecycleState == Lifecycle.State.RESUMED && biometricAvailable && !hasAutoAttempted) {
+            hasAutoAttempted = true
+            delay(600)
+            safeAuthenticate()
         }
     }
 
@@ -158,7 +175,7 @@ fun AuthScreen(
                 }
 
                 Button(
-                    onClick = { startAuthentication() },
+                    onClick = { safeAuthenticate() },
                     enabled = !isAuthenticating
                 ) {
                     Text(

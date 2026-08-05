@@ -78,16 +78,39 @@ abstract class SnapJeDatabase : RoomDatabase() {
         /**
          * Get singleton database instance.
          * Creates database if it doesn't exist.
+         *
+         * 加固：打开/校验失败（例如旧版数据库 schema 不兼容）时自动删除重建，
+         * 避免 App 启动时抛异常闪退。
          */
         fun getDatabase(context: Context): SnapJeDatabase {
             return INSTANCE ?: synchronized(this) {
-                val instance = Room.databaseBuilder(
-                    context.applicationContext,
-                    SnapJeDatabase::class.java,
-                    DATABASE_NAME
-                )
+                INSTANCE ?: buildDatabase(context.applicationContext).also { INSTANCE = it }
+            }
+        }
+
+        private fun buildDatabase(context: Context): SnapJeDatabase {
+            return try {
+                val db = createBuilder(context).build()
+                // 主动打开并校验 schema；失败抛异常走下方重建逻辑
+                db.openHelper.writableDatabase
+                db
+            } catch (e: Exception) {
+                L.e("SnapJeDatabase", "DB open failed, deleting and rebuilding", e)
+                context.deleteDatabase(DATABASE_NAME)
+                val db = createBuilder(context).build()
+                db.openHelper.writableDatabase
+                db
+            }
+        }
+
+        private fun createBuilder(context: Context): RoomDatabase.Builder<SnapJeDatabase> {
+            return Room.databaseBuilder(
+                context,
+                SnapJeDatabase::class.java,
+                DATABASE_NAME
+            )
                 .addMigrations(MIGRATION_1_2)
-                // fallbackToDestructiveMigration 作为最后兜底（正常升级走 MIGRATION_1_2）
+                // 版本号不匹配且无迁移路径时直接重建，避免启动崩溃
                 .fallbackToDestructiveMigration()
                 .addCallback(object : Callback() {
                     override fun onCreate(db: SupportSQLiteDatabase) {
@@ -100,10 +123,6 @@ abstract class SnapJeDatabase : RoomDatabase() {
                         L.d("SnapJeDatabase", "Database opened")
                     }
                 })
-                .build()
-                INSTANCE = instance
-                instance
-            }
         }
 
         /**
