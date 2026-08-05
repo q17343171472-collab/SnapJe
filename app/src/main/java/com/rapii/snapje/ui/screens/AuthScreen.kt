@@ -99,7 +99,7 @@ fun AuthScreen(
 
     // 首次进入自动弹出生物识别（仅在前台 RESUMED 状态，避免退后台时触发）
     val lifecycleOwner = LocalLifecycleOwner.current
-    val lifecycleState by lifecycleOwner.lifecycle.currentStateAsState()
+    val lifecycleState by lifecycleOwner.lifecycle.currentStateAsState
     LaunchedEffect(lifecycleState, fragmentActivity, biometricAvailable) {
         if (lifecycleState == Lifecycle.State.RESUMED && biometricAvailable) {
             startAuthentication()
