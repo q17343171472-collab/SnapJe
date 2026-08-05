@@ -32,6 +32,8 @@ object SettingsKeys {
     val PIN_HASH = stringPreferencesKey("pin_hash")
     val PIN_SALT = stringPreferencesKey("pin_salt")
     val PIN_LENGTH = intPreferencesKey("pin_length")
+    val PIN_ENABLED = booleanPreferencesKey("pin_enabled")
+    val AUTO_DELETE_ORIGINAL = booleanPreferencesKey("auto_delete_original")
 }
 
 /**
@@ -51,8 +53,46 @@ class SettingsManager @Inject constructor(
             theme = preferences[SettingsKeys.THEME] ?: "跟随系统",
             defaultSort = preferences[SettingsKeys.DEFAULT_SORT] ?: "最新优先",
             reverseSort = preferences[SettingsKeys.REVERSE_SORT] ?: false,
-            cacheSizeMB = preferences[SettingsKeys.CACHE_SIZE_MB] ?: 100
+            cacheSizeMB = preferences[SettingsKeys.CACHE_SIZE_MB] ?: 100,
+            pinEnabled = preferences[SettingsKeys.PIN_ENABLED] ?: true,
+            autoDeleteOriginal = preferences[SettingsKeys.AUTO_DELETE_ORIGINAL] ?: false
         )
+    }
+
+    /**
+     * 是否启用启动密码验证（默认开启，可在设置中关闭）。
+     */
+    suspend fun isPinEnabled(): Boolean {
+        return context.dataStore.data.map { prefs ->
+            prefs[SettingsKeys.PIN_ENABLED] ?: true
+        }.first()
+    }
+
+    /**
+     * 开启/关闭启动密码验证。
+     */
+    suspend fun setPinEnabled(enabled: Boolean) {
+        context.dataStore.edit { prefs ->
+            prefs[SettingsKeys.PIN_ENABLED] = enabled
+        }
+    }
+
+    /**
+     * 是否开启"导入后自动删除相册原图"（默认关闭；关闭时导入后询问）。
+     */
+    suspend fun isAutoDeleteOriginal(): Boolean {
+        return context.dataStore.data.map { prefs ->
+            prefs[SettingsKeys.AUTO_DELETE_ORIGINAL] ?: false
+        }.first()
+    }
+
+    /**
+     * 开启/关闭"导入后自动删除相册原图"。
+     */
+    suspend fun setAutoDeleteOriginal(enabled: Boolean) {
+        context.dataStore.edit { prefs ->
+            prefs[SettingsKeys.AUTO_DELETE_ORIGINAL] = enabled
+        }
     }
 
     /**
@@ -174,6 +214,8 @@ class SettingsManager @Inject constructor(
             preferences[SettingsKeys.DEFAULT_SORT] = state.defaultSort
             preferences[SettingsKeys.REVERSE_SORT] = state.reverseSort
             preferences[SettingsKeys.CACHE_SIZE_MB] = state.cacheSizeMB
+            preferences[SettingsKeys.PIN_ENABLED] = state.pinEnabled
+            preferences[SettingsKeys.AUTO_DELETE_ORIGINAL] = state.autoDeleteOriginal
         }
     }
 

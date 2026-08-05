@@ -1,6 +1,7 @@
 package com.rapii.snapje.ui
 
 import android.app.Activity
+import android.content.ContentUris
 import android.content.Intent
 import android.net.Uri
 import android.os.Build
@@ -105,6 +106,9 @@ fun PhotoXHomeScreen(
     // ---- 导入成功后是否删除相册原图 ----
     var pendingDeleteOriginalUri by remember { mutableStateOf<Uri?>(null) }
 
+    // 设置管理器（用于读取"自动删除相册原图"开关）
+    val settingsManager = remember { com.rapii.snapje.data.SettingsManager(context.applicationContext) }
+
     // 删除系统相册原图（Android 11+ 需要用户确认的系统对话框）
     val deleteOriginalLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.StartIntentSenderForResult()
@@ -118,30 +122,86 @@ fun PhotoXHomeScreen(
     }
 
     /**
-     * 从手机相册删除原图：
-     * - Android 11+（API 30+）弹系统确认框（MediaStore.createDeleteRequest）
-     * - 更低版本直接删除（manifest 已声明 WRITE_EXTERNAL_STORAGE 最高 API 29）
+     * 把 Photo Picker 返回的 uri（content://media/picker/...）转换成可删除的
+     * MediaStore uri（content://media/external/images/media/{id}）。
+     * 无法转换时原样返回。
+     */
+    fun toMediaStoreUri(uri: Uri): Uri {
+        // 已经是 media 标准地址：直接用
+        if (uri.scheme == "content" && uri.authority?.contains("media") == true &&
+            !uri.path.orEmpty().contains("/picker/")
+        ) {
+            return uri
+        }
+        // 尝试查询 _ID 并拼出标准 media 地址
+        val id = runCatching {
+            context.contentResolver.query(
+                uri,
+                arrayOf(MediaStore.Images.Media._ID),
+                null, null, null
+            )?.use { cursor ->
+                if (cursor.moveToFirst()) {
+                    val idx = cursor.getColumnIndexOrThrow(MediaStore.Images.Media._ID)
+                    cursor.getLong(idx)
+                } else null
+            }
+        }.getOrNull() ?: uri.lastPathSegment?.toLongOrNull()
+        return if (id != null) {
+            ContentUris.withAppendedId(MediaStore.Images.Media.EXTERNAL_CONTENT_URI, id)
+        } else {
+            uri
+        }
+    }
+
+    /**
+     * 从手机相册删除原图（带多重回退，修复部分设备删除失败的问题）：
+     * 1. Android 11+：先转成 MediaStore 标准地址，再弹系统确认框；
+     * 2. 若无法弹框，直接 resolver.delete；
+     * 3. 若仍失败，尝试按文件路径直接删除。
      */
     fun deleteOriginalFromGallery(uri: Uri) {
         val resolver = context.contentResolver
+        val mediaUri = toMediaStoreUri(uri)
+
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
             try {
-                val pendingIntent = MediaStore.createDeleteRequest(resolver, listOf(uri))
+                val pendingIntent = MediaStore.createDeleteRequest(resolver, listOf(mediaUri))
                 val request = androidx.activity.result.IntentSenderRequest.Builder(pendingIntent).build()
                 deleteOriginalLauncher.launch(request)
+                return
             } catch (e: Exception) {
-                // 非 MediaStore URI（如临时文件）直接删
-                runCatching { resolver.delete(uri, null, null) }
-                    .onSuccess { Toast.makeText(context, R.string.original_deleted, Toast.LENGTH_SHORT).show() }
-                    .onFailure { Toast.makeText(context, R.string.original_delete_failed, Toast.LENGTH_LONG).show() }
-                pendingDeleteOriginalUri = null
+                L.e("PhotoXHome", "createDeleteRequest failed, falling back", e)
             }
-        } else {
-            runCatching { resolver.delete(uri, null, null) }
-                .onSuccess { Toast.makeText(context, R.string.original_deleted, Toast.LENGTH_SHORT).show() }
-                .onFailure { Toast.makeText(context, R.string.original_delete_failed, Toast.LENGTH_LONG).show() }
-            pendingDeleteOriginalUri = null
         }
+
+        // 回退 1：直接通过 ContentResolver 删除
+        val deleted = runCatching { resolver.delete(mediaUri, null, null) }.getOrDefault(0)
+        if (deleted > 0) {
+            Toast.makeText(context, R.string.original_deleted, Toast.LENGTH_SHORT).show()
+            pendingDeleteOriginalUri = null
+            return
+        }
+
+        // 回退 2：按文件路径直接删除
+        try {
+            val path = runCatching {
+                resolver.query(mediaUri, arrayOf(MediaStore.Images.Media.DATA), null, null, null)
+                    ?.use { if (it.moveToFirst()) it.getString(0) else null }
+            }.getOrNull()
+            if (!path.isNullOrBlank()) {
+                val file = java.io.File(path)
+                if (file.exists() && file.delete()) {
+                    Toast.makeText(context, R.string.original_deleted, Toast.LENGTH_SHORT).show()
+                    pendingDeleteOriginalUri = null
+                    return
+                }
+            }
+        } catch (e: Exception) {
+            L.e("PhotoXHome", "File delete fallback failed", e)
+        }
+
+        Toast.makeText(context, R.string.original_delete_failed, Toast.LENGTH_LONG).show()
+        pendingDeleteOriginalUri = null
     }
 
     // 系统相册选择（Photo Picker，无需存储权限）
@@ -202,9 +262,14 @@ fun PhotoXHomeScreen(
             val result = viewModel.addPhotoToVault(uri, album)
             if (result.isSuccess) {
                 Toast.makeText(context, context.getString(R.string.import_success), Toast.LENGTH_SHORT).show()
-                // 从系统相册导入的：询问是否删除相册原图（相机临时文件会自动清理，不询问）
+                // 从系统相册导入的：按设置决定删除原图还是询问（相机临时文件自动清理，不处理）
                 if (uri != pendingCameraUri) {
-                    pendingDeleteOriginalUri = uri
+                    val autoDelete = settingsManager.isAutoDeleteOriginal()
+                    if (autoDelete) {
+                        deleteOriginalFromGallery(uri)
+                    } else {
+                        pendingDeleteOriginalUri = uri
+                    }
                 }
             } else {
                 Toast.makeText(

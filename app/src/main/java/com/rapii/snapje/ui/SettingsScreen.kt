@@ -95,7 +95,40 @@ fun SettingsScreen(
 
             // Security Settings
             SettingsSection(title = "安全") {
+                PinLockSetting(
+                    isEnabled = settingsState.pinEnabled,
+                    onEnabledChanged = {
+                        scope.launch {
+                            viewModel.setPinEnabled(it)
+                            Toast.makeText(
+                                context,
+                                if (it) "启动密码验证已开启（下次启动生效）" else "启动密码验证已关闭（下次启动生效）",
+                                Toast.LENGTH_SHORT
+                            ).show()
+                        }
+                    }
+                )
+
+                Divider(modifier = Modifier.padding(horizontal = 16.dp))
+
                 ChangePinSetting(onClick = { showChangePinDialog = true })
+            }
+
+            // Import Settings
+            SettingsSection(title = "导入") {
+                AutoDeleteOriginalSetting(
+                    isEnabled = settingsState.autoDeleteOriginal,
+                    onEnabledChanged = {
+                        scope.launch {
+                            viewModel.setAutoDeleteOriginal(it)
+                            Toast.makeText(
+                                context,
+                                if (it) "已开启：导入后自动删除相册原图" else "已关闭：导入后询问是否删除原图",
+                                Toast.LENGTH_SHORT
+                            ).show()
+                        }
+                    }
+                )
             }
 
             if (showChangePinDialog) {
@@ -197,6 +230,95 @@ fun SettingsSection(
             modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)
         )
         content()
+    }
+}
+
+/**
+ * 启动密码验证开关。
+ * 关闭后 App 启动不再要求输入密码（下次启动生效）。
+ */
+@Composable
+fun PinLockSetting(
+    isEnabled: Boolean,
+    onEnabledChanged: (Boolean) -> Unit
+) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable { onEnabledChanged(!isEnabled) }
+            .padding(horizontal = 16.dp, vertical = 12.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Icon(
+            imageVector = Icons.Default.Lock,
+            contentDescription = null,
+            modifier = Modifier.size(24.dp),
+            tint = MaterialTheme.colorScheme.onSurfaceVariant
+        )
+        Column(
+            modifier = Modifier
+                .weight(1f)
+                .padding(start = 16.dp)
+        ) {
+            Text(
+                text = "启动密码验证",
+                style = MaterialTheme.typography.bodyLarge
+            )
+            Text(
+                text = if (isEnabled) "已开启：打开 App 需输入密码" else "已关闭：打开 App 无需密码",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+        }
+        Switch(
+            checked = isEnabled,
+            onCheckedChange = onEnabledChanged
+        )
+    }
+}
+
+/**
+ * 导入后自动删除相册原图开关。
+ * 开启后：导入照片到保险库时自动删除手机相册里的原图（不再弹框询问）。
+ * 关闭后：导入时弹框询问是否删除原图。
+ */
+@Composable
+fun AutoDeleteOriginalSetting(
+    isEnabled: Boolean,
+    onEnabledChanged: (Boolean) -> Unit
+) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable { onEnabledChanged(!isEnabled) }
+            .padding(horizontal = 16.dp, vertical = 12.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Icon(
+            imageVector = Icons.Default.DeleteSweep,
+            contentDescription = null,
+            modifier = Modifier.size(24.dp),
+            tint = MaterialTheme.colorScheme.onSurfaceVariant
+        )
+        Column(
+            modifier = Modifier
+                .weight(1f)
+                .padding(start = 16.dp)
+        ) {
+            Text(
+                text = "导入后自动删除相册原图",
+                style = MaterialTheme.typography.bodyLarge
+            )
+            Text(
+                text = if (isEnabled) "已开启：导入后相册原图自动删除" else "已关闭：导入后询问是否删除",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+        }
+        Switch(
+            checked = isEnabled,
+            onCheckedChange = onEnabledChanged
+        )
     }
 }
 
@@ -587,7 +709,9 @@ data class SettingsState(
     val theme: String = "跟随系统",
     val defaultSort: String = "最新优先",
     val reverseSort: Boolean = false,
-    val cacheSizeMB: Int = 100
+    val cacheSizeMB: Int = 100,
+    val pinEnabled: Boolean = true,
+    val autoDeleteOriginal: Boolean = false
 )
 
 /**
@@ -625,6 +749,14 @@ class SettingsViewModel @Inject constructor(
 
     suspend fun setCacheSizeMB(size: Int) {
         settingsManager.setCacheSizeMB(size)
+    }
+
+    suspend fun setPinEnabled(enabled: Boolean) {
+        settingsManager.setPinEnabled(enabled)
+    }
+
+    suspend fun setAutoDeleteOriginal(enabled: Boolean) {
+        settingsManager.setAutoDeleteOriginal(enabled)
     }
 
     suspend fun changePin(oldPin: String, newPin: String): Boolean {

@@ -51,6 +51,9 @@ class MainActivity : FragmentActivity() {
     /** 已设置的密码位数 */
     private var pinLength by mutableStateOf(4)
 
+    /** 是否启用启动密码验证（设置中可关闭） */
+    private var pinEnabled by mutableStateOf(true)
+
     @Inject
     lateinit var settingsManager: SettingsManager
 
@@ -63,11 +66,16 @@ class MainActivity : FragmentActivity() {
 
         super.onCreate(savedInstanceState)
 
-        // 读取 PIN 设置状态：是否已设置密码、密码位数
+        // 读取 PIN 设置状态：是否已设置密码、密码位数、是否启用验证
         lifecycleScope.launch {
             hasPin = settingsManager.hasPin()
             pinLength = settingsManager.pinLength()
+            pinEnabled = settingsManager.isPinEnabled()
             authReady = true
+            // 用户已关闭密码验证：直接进入，不显示验证页
+            if (!pinEnabled) {
+                isUnlocked = true
+            }
         }
 
         // CRITICAL: Enable hardware acceleration for smooth transitions
@@ -94,7 +102,7 @@ class MainActivity : FragmentActivity() {
                     GalleryNavGraph(navController = navController)
 
                     // 上锁时用全屏 AuthScreen 覆盖（盖在最上层）
-                    if (!isUnlocked && authReady) {
+                    if (!isUnlocked && authReady && pinEnabled) {
                         AuthScreen(
                             isFirstTimeSetup = !hasPin,
                             pinLength = pinLength,
@@ -121,8 +129,9 @@ class MainActivity : FragmentActivity() {
 
     override fun onStop() {
         super.onStop()
-        // App 退到后台即重新上锁（配置变更除外，避免旋转屏幕时重新验证）
-        if (!isChangingConfigurations) {
+        // App 退到后台即重新上锁（配置变更除外，避免旋转屏幕时重新验证）。
+        // 仅当启用密码验证时上锁；关闭验证后不再弹密码。
+        if (pinEnabled && !isChangingConfigurations) {
             isUnlocked = false
             // 清理 Coil 磁盘缓存中的可能明文残留（保险库加载器本身已禁用磁盘缓存）
             runCatching { ImageLoaderFactory.clearAllDiskCaches(this) }
