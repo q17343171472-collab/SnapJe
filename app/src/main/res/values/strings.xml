@@ -1,158 +1,165 @@
-﻿<?xml version="1.0" encoding="utf-8"?>  
-<resources>  
-    <string name="app_name">SnapJe!</string>  
-    <string name="permission_required_title">Permission Required</string>  
-    <string name="permission_required_message">GalleryX needs permission to access your photos and videos to display them in the gallery.</string>  
-    <string name="grant_permission">Grant Permission</string>  
-    <string name="no_media_found">No photos or videos found</string>  
-    <string name="all_images">All Images</string>  
-    <string name="all_videos">All Videos</string>  
-    <string name="albums">Albums</string>  
-    <string name="loading">Loading...</string>  
-    <string name="error_loading">Error loading gallery</string>  
-    <string name="photos_count">%1$d photos</string>  
-    <string name="refresh">Refresh</string>  
-    <string name="retry">Retry</string>  
-    <string name="back">Back</string>  
-    <string name="info">Info</string>  
-    <string name="share">Share</string>  
-    <string name="zoom_in">Zoom in</string>  
-    <string name="zoom_out">Zoom out</string>  
-    <string name="reset">Reset zoom</string>  
-    <string name="photo_details">Photo Details</string>  
-    <string name="all_photos">All Photos</string>  
-    <string name="album_view">Album View</string>  
-    <string name="no_photos_found">No photos found</string>  
-    <string name="search">Search</string>  
-    <string name="sort">Sort</string>  
-    <string name="camera">Camera</string>  
-    <string name="pinned">Pinned</string>  
-    <string name="more_options">More options</string> 
-    <string name="content_description">Content description</string>  
-    <!-- Empty States -->  
-    <string name="no_photos_yet">No photos yet</string>  
-    <string name="no_photos_in_folder">No photos in this folder</string>  
-    <string name="take_photos_or_move">Take some photos or move images here</string>  
-    <!-- Category Detail -->  
-    <string name="delete">Delete</string>  
-    <string name="rename">Rename</string>  
-    <string name="copy">Copy</string>  
-    <string name="move">Move</string>  
-    <string name="cancel">Cancel</string>  
-    <string name="select">Select</string>  
-    <string name="photos_selected">%1$d selected</string>  
-    <!-- Trash -->  
-    <string name="photo_moved_to_trash">Photo moved to trash</string>  
-    <string name="photos_moved_to_trash">%1$d photos moved to trash</string>  
-    <string name="delete_cancelled">Delete cancelled</string>  
-    <string name="permission_needed">Permission needed</string>  
-    <string name="coming_soon">Coming soon</string>  
-    <string name="photo_restored">Photo restored</string>  
-    <string name="photo_permanently_deleted">Photo permanently deleted</string> 
-    <!-- Recently Deleted Screen -->  
-    <string name="recently_deleted">Recently Deleted</string>  
-    <string name="days_remaining">%1$d days remaining</string>  
-    <string name="empty_trash">Empty Trash</string>  
-    <string name="restore">Restore</string>  
-    <string name="permanently_delete">Delete Permanently</string>  
-    <string name="trash_empty">Trash is empty</string>  
-    <string name="trash_empty_message">Deleted photos will appear here for 30 days</string>  
-    <!-- Photo Gallery -->  
-    <string name="photo_counter">%1$d / %2$d</string>  
-    <string name="photo_info_name">Name: %1$s</string>  
-    <string name="photo_info_path">Path: %1$s</string>  
-    <string name="photo_info_size">Size: %1$s</string>  
-    <string name="photo_info_dimensions">Dimensions: %1$s</string>  
-    <string name="photo_info_date">Date: %1$s</string>  
-    <!-- File Operations -->  
-    <string name="rename_photo">Rename Photo</string>  
-    <string name="new_name_hint">New name</string>  
-    <string name="file_exists">File already exists</string>  
-    <string name="invalid_name">Invalid file name</string>  
-    <!-- Sort Options -->  
-    <string name="sort_recent">Recent activity</string>  
-    <string name="sort_name_az">Name (A-Z)</string>  
-    <string name="sort_count">Item count</string>  
-    <string name="sort_pinned">Pinned first</string>  
-    <!-- Permission Screen -->  
-    <string name="photo_access_required">Photo Access Required</string>  
-    <string name="photo_access_description">GalleryX needs permission to access your photos to organize them by folders.</string>  
-    <string name="browse_photos_organized">You\'ll be able to browse photos organized by:</string> 
-    <string name="folder_camera">- Camera photos</string>  
-    <string name="folder_screenshots">- Screenshots</string>  
-    <string name="folder_whatsapp">- WhatsApp images</string>  
-    <string name="folder_downloads">- Downloads</string>  
-    <string name="folder_instagram">- Instagram photos</string>  
-    <string name="folder_custom">- Custom folders</string>  
-    <!-- Menu Items -->  
-    <string name="pin_to_top">Pin to top</string>  
-    <string name="unpin">Unpin</string>  
-    <string name="hide_category">Hide category</string>  
-    <string name="recent_activity">Recent activity</string>  
-    <string name="name_az">Name (A-Z)</string>  
-    <string name="item_count">Item count</string>  
-    <string name="pinned_first">Pinned first</string>  
-    <!-- Search -->  
-    <string name="search_photos">Search photos</string>  
-    <string name="clear">Clear</string>  
-    <string name="no_results_found">No results found</string>  
-    <!-- Content Descriptions -->  
-    <string name="cd_category_thumbnail">Thumbnail for %1$s folder</string>  
-    <string name="cd_photo_thumbnail">Photo thumbnail</string>  
-    <string name="cd_photo_item">Photo: %1$s</string>  
-    <string name="cd_selected_photo">Selected: %1$s</string>  
-    <string name="cd_unselected_photo">Unselected: %1$s</string>  
-    <string name="cd_pin_category">Pin %1$s to top</string>  
-    <string name="cd_hide_category">Hide %1$s folder</string> 
-    <string name="cd_delete_photo">Delete photo %1$s</string>  
-    <string name="cd_restore_photo">Restore photo %1$s</string>  
-    <string name="cd_share_photo">Share photo %1$s</string>  
-    <string name="cd_zoom_in">Zoom in</string>  
-    <string name="cd_zoom_out">Zoom out</string>  
-    <string name="cd_navigate_back">Go back</string>  
-    <string name="cd_open_menu">Open menu</string>  
-    <string name="cd_close">Close</string>  
-    <string name="cd_search_photos">Search photos</string>  
-    <string name="cd_empty_trash">Empty trash</string>  
-    <string name="cd_days_remaining">%1$d days remaining before permanent deletion</string>  
-    <string name="cd_trashed_photo">Trashed photo: %1$s</string>  
-    <!-- Toast Messages -->  
-    <string name="failed_to_share">Failed to share: %1$s</string>  
-    <string name="photo_moved_to_trash_toast">Photo moved to trash</string>  
-    <string name="delete_cancelled_toast">Delete cancelled</string>  
-    <string name="copied_to_folder">Copied to %1$s</string>  
-    <string name="permission_needed_for_copy">Permission needed for copy</string>  
-    <string name="moved_to_folder">Moved to %1$s</string>  
-    <string name="permission_needed_for_move">Permission needed for move</string>  
-    <string name="failed_to_delete_photos">Failed to delete photos</string>  
-    <string name="permission_needed_for_rename">Permission needed for rename</string>  
-    <string name="photo_restored_toast">Photo restored</string>  
-    <string name="permanently_deleted_toast">Permanently deleted</string>  
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">SnapJe</string>
+    <string name="permission_required_title">需要权限</string>
+    <string name="permission_required_message">SnapJe 需要访问您的照片和视频权限，以便在相册中展示。</string>
+    <string name="grant_permission">授予权限</string>
+    <string name="no_media_found">未找到照片或视频</string>
+    <string name="all_images">所有图片</string>
+    <string name="all_videos">所有视频</string>
+    <string name="albums">相册</string>
+    <string name="loading">加载中...</string>
+    <string name="error_loading">加载相册失败</string>
+    <string name="photos_count">%1$d 张照片</string>
+    <string name="refresh">刷新</string>
+    <string name="retry">重试</string>
+    <string name="back">返回</string>
+    <string name="info">信息</string>
+    <string name="share">分享</string>
+    <string name="zoom_in">放大</string>
+    <string name="zoom_out">缩小</string>
+    <string name="reset">重置缩放</string>
+    <string name="photo_details">照片详情</string>
+    <string name="all_photos">所有照片</string>
+    <string name="album_view">相册视图</string>
+    <string name="no_photos_found">未找到照片</string>
+    <string name="search">搜索</string>
+    <string name="sort">排序</string>
+    <string name="camera">相机</string>
+    <string name="pinned">置顶</string>
+    <string name="more_options">更多选项</string>
+    <string name="content_description">内容描述</string>
+    <!-- 空状态 -->
+    <string name="no_photos_yet">还没有照片</string>
+    <string name="no_photos_in_folder">此文件夹中没有照片</string>
+    <string name="take_photos_or_move">拍些照片或把图片移到这里</string>
+    <!-- 分类详情 -->
+    <string name="delete">删除</string>
+    <string name="rename">重命名</string>
+    <string name="copy">复制</string>
+    <string name="move">移动</string>
+    <string name="cancel">取消</string>
+    <string name="select">选择</string>
+    <string name="photos_selected">已选择 %1$d 项</string>
+    <!-- 回收站 -->
+    <string name="photo_moved_to_trash">照片已移至回收站</string>
+    <string name="photos_moved_to_trash">%1$d 张照片已移至回收站</string>
+    <string name="delete_cancelled">删除已取消</string>
+    <string name="permission_needed">需要权限</string>
+    <string name="coming_soon">敬请期待</string>
+    <string name="photo_restored">照片已恢复</string>
+    <string name="photo_permanently_deleted">照片已永久删除</string>
+    <!-- 最近删除页面 -->
+    <string name="recently_deleted">最近删除</string>
+    <string name="days_remaining">剩余 %1$d 天</string>
+    <string name="empty_trash">清空回收站</string>
+    <string name="restore">恢复</string>
+    <string name="permanently_delete">永久删除</string>
+    <string name="trash_empty">回收站为空</string>
+    <string name="trash_empty_message">删除的照片会在这里保留 30 天</string>
+    <!-- 照片浏览 -->
+    <string name="photo_counter">%1$d / %2$d</string>
+    <string name="photo_info_name">名称：%1$s</string>
+    <string name="photo_info_path">路径：%1$s</string>
+    <string name="photo_info_size">大小：%1$s</string>
+    <string name="photo_info_dimensions">尺寸：%1$s</string>
+    <string name="photo_info_date">日期：%1$s</string>
+    <!-- 文件操作 -->
+    <string name="rename_photo">重命名照片</string>
+    <string name="new_name_hint">新名称</string>
+    <string name="file_exists">文件已存在</string>
+    <string name="invalid_name">文件名无效</string>
+    <!-- 排序选项 -->
+    <string name="sort_recent">最近活动</string>
+    <string name="sort_name_az">名称 (A-Z)</string>
+    <string name="sort_count">项目数量</string>
+    <string name="sort_pinned">置顶优先</string>
+    <!-- 权限页 -->
+    <string name="photo_access_required">需要照片访问权限</string>
+    <string name="photo_access_description">SnapJe 需要访问您的照片权限，以便按文件夹整理。</string>
+    <string name="browse_photos_organized">您将可以浏览按以下方式整理的照片：</string>
+    <string name="folder_camera">- 相机照片</string>
+    <string name="folder_screenshots">- 截图</string>
+    <string name="folder_whatsapp">- 微信/WhatsApp 图片</string>
+    <string name="folder_downloads">- 下载</string>
+    <string name="folder_instagram">- 社交平台照片</string>
+    <string name="folder_custom">- 自定义文件夹</string>
+    <!-- 菜单项 -->
+    <string name="pin_to_top">置顶</string>
+    <string name="unpin">取消置顶</string>
+    <string name="hide_category">隐藏分类</string>
+    <string name="recent_activity">最近活动</string>
+    <string name="name_az">名称 (A-Z)</string>
+    <string name="item_count">项目数量</string>
+    <string name="pinned_first">置顶优先</string>
+    <!-- 搜索 -->
+    <string name="search_photos">搜索照片</string>
+    <string name="clear">清除</string>
+    <string name="no_results_found">未找到结果</string>
+    <!-- 无障碍描述 -->
+    <string name="cd_category_thumbnail">%1$s 文件夹的缩略图</string>
+    <string name="cd_photo_thumbnail">照片缩略图</string>
+    <string name="cd_photo_item">照片：%1$s</string>
+    <string name="cd_selected_photo">已选择：%1$s</string>
+    <string name="cd_unselected_photo">未选择：%1$s</string>
+    <string name="cd_pin_category">将 %1$s 置顶</string>
+    <string name="cd_hide_category">隐藏 %1$s 文件夹</string>
+    <string name="cd_delete_photo">删除照片 %1$s</string>
+    <string name="cd_restore_photo">恢复照片 %1$s</string>
+    <string name="cd_share_photo">分享照片 %1$s</string>
+    <string name="cd_zoom_in">放大</string>
+    <string name="cd_zoom_out">缩小</string>
+    <string name="cd_navigate_back">返回</string>
+    <string name="cd_open_menu">打开菜单</string>
+    <string name="cd_close">关闭</string>
+    <string name="cd_search_photos">搜索照片</string>
+    <string name="cd_empty_trash">清空回收站</string>
+    <string name="cd_days_remaining">永久删除前剩余 %1$d 天</string>
+    <string name="cd_trashed_photo">回收站照片：%1$s</string>
+    <!-- 提示消息 -->
+    <string name="failed_to_share">分享失败：%1$s</string>
+    <string name="photo_moved_to_trash_toast">照片已移至回收站</string>
+    <string name="delete_cancelled_toast">删除已取消</string>
+    <string name="copied_to_folder">已复制到 %1$s</string>
+    <string name="permission_needed_for_copy">复制需要权限</string>
+    <string name="moved_to_folder">已移动到 %1$s</string>
+    <string name="permission_needed_for_move">移动需要权限</string>
+    <string name="failed_to_delete_photos">删除照片失败</string>
+    <string name="permission_needed_for_rename">重命名需要权限</string>
+    <string name="photo_restored_toast">照片已恢复</string>
+    <string name="permanently_deleted_toast">已永久删除</string>
 
-    <!-- Vault / Biometric Auth -->  
-    <string name="auth_required">验证指纹或面部以继续</string>  
-    <string name="auth_description">SnapJe 将您的照片加密存储在 App 内，只有您本人可以查看。</string>  
-    <string name="auth_retry">重新验证</string>  
-    <string name="auth_waiting">正在验证…</string>  
-    <string name="auth_cancelled">验证已取消，请重试</string>  
-    <string name="auth_failed_retry">验证失败，请重试</string>  
-    <string name="biometric_unavailable">此设备不支持指纹或面部识别，无法使用 SnapJe 保险库</string>  
-    <string name="exit_app">退出</string>  
-    <string name="add_photo">添加照片</string>  
-    <string name="pick_from_gallery">从系统相册选择</string>  
-    <string name="take_photo">拍照</string>  
-    <string name="vault_empty">保险库为空</string>  
-    <string name="vault_empty_message">点击右下角按钮，将照片加密存入保险库</string>  
-    <string name="import_success">已加密存入保险库</string>  
-    <string name="import_success_confirm">存入保险库</string>  
-    <string name="import_failed">导入失败：%1$s</string>  
-    <string name="vault_album_hint">相册名称</string>  
-    <string name="vault_default_album">我的保险库</string>  
-    <string name="confirm_delete_vault">删除后将无法恢复，确认删除？</string>  
-    <string name="delete_vault_photo">删除保险库照片</string>  
-    <string name="vault_photo_deleted">已从保险库删除</string>  
-    <string name="vault_photos_deleted">%1$d 张照片已从保险库删除</string>  
-    <string name="vault_renamed">已重命名</string>  
-    <string name="vault_op_not_supported">该操作仅支持系统相册照片</string>  
-    <string name="cd_fingerprint">指纹验证图标</string>  
-</resources>  
+    <!-- 保险库 -->
+    <string name="auth_required">请输入密码以继续</string>
+    <string name="auth_description">SnapJe 将您的照片加密存储在 App 内，只有您本人可以查看。</string>
+    <string name="auth_retry">重新验证</string>
+    <string name="auth_waiting">正在验证…</string>
+    <string name="auth_cancelled">验证已取消，请重试</string>
+    <string name="auth_failed_retry">验证失败，请重试</string>
+    <string name="biometric_unavailable">此设备不支持生物识别，无法使用验证功能</string>
+    <string name="exit_app">退出</string>
+    <string name="add_photo">添加照片</string>
+    <string name="pick_from_gallery">从系统相册选择</string>
+    <string name="take_photo">拍照</string>
+    <string name="vault_empty">保险库为空</string>
+    <string name="vault_empty_message">点击右下角按钮，将照片加密存入保险库</string>
+    <string name="import_success">已加密存入保险库</string>
+    <string name="import_success_confirm">存入保险库</string>
+    <string name="import_failed">导入失败：%1$s</string>
+    <string name="vault_album_hint">相册名称</string>
+    <string name="vault_default_album">我的保险库</string>
+    <string name="confirm_delete_vault">删除后将无法恢复，确认删除？</string>
+    <string name="delete_vault_photo">删除保险库照片</string>
+    <string name="vault_photo_deleted">已从保险库删除</string>
+    <string name="vault_photos_deleted">%1$d 张照片已从保险库删除</string>
+    <string name="vault_renamed">已重命名</string>
+    <string name="vault_op_not_supported">该操作仅支持系统相册照片</string>
+    <string name="cd_fingerprint">指纹验证图标</string>
+    <string name="delete_original_title">删除相册原图？</string>
+    <string name="delete_original_message">照片已加密存入保险库。是否同时从手机相册删除原图？\n\n删除后，手机相册和其他应用将无法再看到这张照片，只有保险库里能看。</string>
+    <string name="delete_original_confirm">删除相册原图</string>
+    <string name="delete_original_keep">保留原图</string>
+    <string name="original_deleted">已从手机相册删除原图</string>
+    <string name="original_kept">原图已保留在手机相册</string>
+    <string name="original_delete_failed">删除原图失败，请手动删除</string>
+</resources>

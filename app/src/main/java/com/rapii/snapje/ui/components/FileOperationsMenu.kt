@@ -48,50 +48,50 @@ fun FileOperationsBottomSheet(
             // Operations
             FileOperationItem(
                 icon = Icons.Default.Delete,
-                label = "Delete",
+                label = "删除",
                 tint = MaterialTheme.colorScheme.error,
                 onClick = { onOperation(FileOperationType.DELETE) }
             )
             
             FileOperationItem(
                 icon = Icons.Default.HideImage,
-                label = "Hide",
+                label = "隐藏",
                 onClick = { onOperation(FileOperationType.HIDE) }
             )
             
             FileOperationItem(
                 icon = Icons.Default.Edit,
-                label = "Rename",
+                label = "重命名",
                 onClick = { onOperation(FileOperationType.RENAME) }
             )
             
             FileOperationItem(
                 icon = Icons.Default.ContentCopy,
-                label = "Copy",
+                label = "复制",
                 onClick = { onOperation(FileOperationType.COPY) }
             )
             
             FileOperationItem(
                 icon = Icons.AutoMirrored.Filled.DriveFileMove,
-                label = "Move",
+                label = "移动",
                 onClick = { onOperation(FileOperationType.MOVE) }
             )
             
             FileOperationItem(
                 icon = Icons.Default.Crop,
-                label = "Crop",
+                label = "裁剪",
                 onClick = { onOperation(FileOperationType.CROP) }
             )
             
             FileOperationItem(
                 icon = Icons.Default.Share,
-                label = "Share",
+                label = "分享",
                 onClick = { onOperation(FileOperationType.SHARE) }
             )
             
             FileOperationItem(
                 icon = Icons.Default.Info,
-                label = "Info",
+                label = "信息",
                 onClick = { onOperation(FileOperationType.INFO) }
             )
             

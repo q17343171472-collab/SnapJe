@@ -45,7 +45,7 @@ fun CategoryDetailTopAppBar(
             IconButton(onClick = onRefresh) {
                 Icon(
                     imageVector = Icons.Default.Refresh,
-                    contentDescription = "Refresh"
+                    contentDescription = "刷新"
                 )
             }
         },
@@ -71,7 +71,7 @@ fun CategoryDetailSelectionTopAppBar(
     TopAppBar(
         title = {
             Text(
-                text = "$selectedCount file${if (selectedCount != 1) "s" else ""} selected",
+                text = "已选择 $selectedCount 项",
                 style = MaterialTheme.typography.titleLarge
             )
         },
@@ -79,7 +79,7 @@ fun CategoryDetailSelectionTopAppBar(
             IconButton(onClick = onCancel) {
                 Icon(
                     imageVector = Icons.Default.Close,
-                    contentDescription = "Cancel"
+                    contentDescription = "取消"
                 )
             }
         },
@@ -90,7 +90,7 @@ fun CategoryDetailSelectionTopAppBar(
             ) {
                 Icon(
                     imageVector = Icons.Outlined.Delete,
-                    contentDescription = "Delete",
+                    contentDescription = "删除",
                     tint = if (canDelete) {
                         MaterialTheme.colorScheme.error
                     } else {

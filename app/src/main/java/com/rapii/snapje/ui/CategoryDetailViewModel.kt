@@ -97,7 +97,7 @@ class CategoryDetailViewModel @Inject constructor(
             _uiState.update {
                 it.copy(
                     isLoading = false,
-                    error = "Invalid category ID. Please go back and try again.",
+                    error = "无效的相册 ID，请返回后重试。",
                     photos = emptyList()
                 )
             }
@@ -179,7 +179,7 @@ class CategoryDetailViewModel @Inject constructor(
      * 删除保险库照片（密文文件 + DB 记录 + 临时文件）。
      */
     suspend fun deleteVaultPhoto(photo: PhotoItem): Result<Unit> {
-        val vaultId = photo.vaultId ?: return Result.failure(IllegalStateException("Not a vault photo"))
+        val vaultId = photo.vaultId ?: return Result.failure(IllegalStateException("不是保险库照片"))
         return vaultRepository.deletePhoto(vaultId)
     }
 
@@ -187,7 +187,7 @@ class CategoryDetailViewModel @Inject constructor(
      * 重命名保险库照片（仅显示名）。
      */
     suspend fun renameVaultPhoto(photo: PhotoItem, newName: String): Result<Unit> {
-        val vaultId = photo.vaultId ?: return Result.failure(IllegalStateException("Not a vault photo"))
+        val vaultId = photo.vaultId ?: return Result.failure(IllegalStateException("不是保险库照片"))
         return vaultRepository.renamePhoto(vaultId, newName)
     }
 

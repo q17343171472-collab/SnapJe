@@ -50,7 +50,7 @@ fun SettingsScreen(
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text("Settings") },
+                title = { Text("设置") },
                 navigationIcon = {
                     IconButton(onClick = onBack) {
                         Icon(
@@ -69,13 +69,13 @@ fun SettingsScreen(
                 .verticalScroll(rememberScrollState())
         ) {
             // Display Settings
-            SettingsSection(title = "Display") {
+            SettingsSection(title = "显示") {
                 GridSizeSetting(
                     currentSize = settingsState.gridColumns,
                     onSizeChanged = { 
                         scope.launch {
                             viewModel.setGridColumns(it)
-                            Toast.makeText(context, "Grid size updated", Toast.LENGTH_SHORT).show()
+                            Toast.makeText(context, "网格大小已更新", Toast.LENGTH_SHORT).show()
                         }
                     }
                 )
@@ -87,14 +87,14 @@ fun SettingsScreen(
                     onThemeChanged = { 
                         scope.launch {
                             viewModel.setTheme(it)
-                            Toast.makeText(context, "Theme preference saved", Toast.LENGTH_SHORT).show()
+                            Toast.makeText(context, "主题设置已保存", Toast.LENGTH_SHORT).show()
                         }
                     }
                 )
             }
 
             // Security Settings
-            SettingsSection(title = "Security") {
+            SettingsSection(title = "安全") {
                 ChangePinSetting(onClick = { showChangePinDialog = true })
             }
 
@@ -116,13 +116,13 @@ fun SettingsScreen(
             }
 
             // Sorting Settings
-            SettingsSection(title = "Sorting") {
+            SettingsSection(title = "排序") {
                 DefaultSortSetting(
                     currentSort = settingsState.defaultSort,
                     onSortChanged = { 
                         scope.launch {
                             viewModel.setDefaultSort(it)
-                            Toast.makeText(context, "Default sort updated", Toast.LENGTH_SHORT).show()
+                            Toast.makeText(context, "默认排序已更新", Toast.LENGTH_SHORT).show()
                         }
                     }
                 )
@@ -134,20 +134,20 @@ fun SettingsScreen(
                     onReversedChanged = { 
                         scope.launch {
                             viewModel.setReverseSort(it)
-                            Toast.makeText(context, "Reverse sort ${if (it) "enabled" else "disabled"}", Toast.LENGTH_SHORT).show()
+                            Toast.makeText(context, "反向排序${if (it) "已开启" else "已关闭"}", Toast.LENGTH_SHORT).show()
                         }
                     }
                 )
             }
 
             // Cache Settings
-            SettingsSection(title = "Storage & Cache") {
+            SettingsSection(title = "存储与缓存") {
                 CacheSizeSetting(
                     cacheSizeMB = settingsState.cacheSizeMB,
                     onCacheSizeChanged = { 
                         scope.launch {
                             viewModel.setCacheSizeMB(it)
-                            Toast.makeText(context, "Cache size limit updated", Toast.LENGTH_SHORT).show()
+                            Toast.makeText(context, "缓存大小已更新", Toast.LENGTH_SHORT).show()
                         }
                     }
                 )
@@ -158,20 +158,20 @@ fun SettingsScreen(
                     onClearCache = { 
                         scope.launch {
                             viewModel.clearCache()
-                            Toast.makeText(context, "Cache cleared", Toast.LENGTH_SHORT).show()
+                            Toast.makeText(context, "缓存已清除", Toast.LENGTH_SHORT).show()
                         }
                     }
                 )
             }
 
             // About Section
-            SettingsSection(title = "About") {
+            SettingsSection(title = "关于") {
                 AboutSetting(
                     versionName = "1.1.0",
                     onClick = { 
                         // Show about dialog with app information
                         // Implemented basic about functionality showing version
-                        Toast.makeText(context, "SnapJe! v1.1.0\nA modern Android photo gallery", Toast.LENGTH_LONG).show()
+                        Toast.makeText(context, "SnapJe! v1.1.0\n一个私密的照片保险库应用", Toast.LENGTH_LONG).show()
                     }
                 )
             }
@@ -323,8 +323,8 @@ fun GridSizeSetting(
 
     SettingsItem(
         icon = Icons.Default.GridView,
-        title = "Grid Size",
-        subtitle = "$currentSize columns"
+        title = "网格大小",
+        subtitle = "$currentSize 列"
     ) {
         expanded = true
     }
@@ -335,7 +335,7 @@ fun GridSizeSetting(
     ) {
         listOf(2, 3, 4).forEach { size ->
             DropdownMenuItem(
-                text = { Text("$size columns") },
+                text = { Text("$size 列") },
                 onClick = {
                     onSizeChanged(size)
                     expanded = false
@@ -357,7 +357,7 @@ fun ThemeSetting(
 
     SettingsItem(
         icon = Icons.Default.Palette,
-        title = "Theme",
+        title = "主题",
         subtitle = currentTheme
     ) {
         expanded = true
@@ -367,7 +367,7 @@ fun ThemeSetting(
         expanded = expanded,
         onDismissRequest = { expanded = false }
     ) {
-        listOf("System", "Light", "Dark").forEach { theme ->
+        listOf("跟随系统", "浅色", "深色").forEach { theme ->
             DropdownMenuItem(
                 text = { Text(theme) },
                 onClick = {
@@ -391,7 +391,7 @@ fun DefaultSortSetting(
 
     SettingsItem(
         icon = Icons.Default.Sort,
-        title = "Default Sort",
+        title = "默认排序",
         subtitle = currentSort
     ) {
         expanded = true
@@ -401,7 +401,7 @@ fun DefaultSortSetting(
         expanded = expanded,
         onDismissRequest = { expanded = false }
     ) {
-        listOf("Date (Newest)", "Date (Oldest)", "Name (A-Z)", "Name (Z-A)", "Size").forEach { sort ->
+        listOf("最新优先", "最旧优先", "名称 (A-Z)", "名称 (Z-A)", "大小").forEach { sort ->
             DropdownMenuItem(
                 text = { Text(sort) },
                 onClick = {
@@ -423,8 +423,8 @@ fun ReverseSortSetting(
 ) {
     SettingsItem(
         icon = Icons.Default.SwapVert,
-        title = "Reverse Sort Order",
-        subtitle = if (isReversed) "Enabled" else "Disabled"
+        title = "反向排序",
+        subtitle = if (isReversed) "已开启" else "已关闭"
     ) {
         onReversedChanged(!isReversed)
     }
@@ -442,7 +442,7 @@ fun CacheSizeSetting(
 
     SettingsItem(
         icon = Icons.Default.Storage,
-        title = "Cache Size Limit",
+        title = "缓存大小上限",
         subtitle = "$cacheSizeMB MB"
     ) {
         expanded = true
@@ -486,12 +486,12 @@ fun ClearCacheButton(
         )
         Column(modifier = Modifier.padding(start = 16.dp)) {
             Text(
-                text = "Clear Cache",
+                text = "清除缓存",
                 style = MaterialTheme.typography.bodyLarge,
                 color = MaterialTheme.colorScheme.error
             )
             Text(
-                text = "Free up storage space",
+                text = "释放存储空间",
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
@@ -521,11 +521,11 @@ fun AboutSetting(
         )
         Column(modifier = Modifier.padding(start = 16.dp)) {
             Text(
-                text = "About SnapJe!",
+                text = "关于 SnapJe",
                 style = MaterialTheme.typography.bodyLarge
             )
             Text(
-                text = "Version $versionName",
+                text = "版本 $versionName",
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
@@ -584,8 +584,8 @@ fun SettingsItem(
  */
 data class SettingsState(
     val gridColumns: Int = Constants.PHOTO_GRID_COLUMNS_PORTRAIT,
-    val theme: String = "System",
-    val defaultSort: String = "Date (Newest)",
+    val theme: String = "跟随系统",
+    val defaultSort: String = "最新优先",
     val reverseSort: Boolean = false,
     val cacheSizeMB: Int = 100
 )

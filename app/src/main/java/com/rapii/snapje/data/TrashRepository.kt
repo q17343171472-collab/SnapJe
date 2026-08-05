@@ -57,12 +57,12 @@ data class TrashedPhoto(
  * Sort options for photos.
  */
 enum class PhotoSortOption(val displayName: String) {
-    DATE_TAKEN_DESC("Newest first"),
-    DATE_TAKEN_ASC("Oldest first"),
-    NAME_ASC("Name (A-Z)"),
-    NAME_DESC("Name (Z-A)"),
-    SIZE_DESC("Largest first"),
-    SIZE_ASC("Smallest first");
+    DATE_TAKEN_DESC("最新优先"),
+    DATE_TAKEN_ASC("最旧优先"),
+    NAME_ASC("名称 (A-Z)"),
+    NAME_DESC("名称 (Z-A)"),
+    SIZE_DESC("最大优先"),
+    SIZE_ASC("最小优先");
 
     companion object {
         val DEFAULT = DATE_TAKEN_DESC

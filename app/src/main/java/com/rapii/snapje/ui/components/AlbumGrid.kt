@@ -53,7 +53,7 @@ fun AlbumGrid(
             contentAlignment = Alignment.Center
         ) {
             Text(
-                text = "No albums found",
+                text = "没有找到相册",
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f),
                 textAlign = androidx.compose.ui.text.style.TextAlign.Center
@@ -274,7 +274,7 @@ private fun AlbumInfoOverlay(album: Album) {
             Spacer(modifier = Modifier.height(2.dp))
             
             Text(
-                text = "${album.photoCount} ${if (album.photoCount == 1) "photo" else "photos"}",
+                text = "${album.photoCount} 张照片",
                 color = Color.White.copy(alpha = 0.8f),
                 style = MaterialTheme.typography.bodySmall
             )

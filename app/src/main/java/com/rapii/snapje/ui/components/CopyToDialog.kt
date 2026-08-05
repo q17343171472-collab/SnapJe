@@ -22,7 +22,7 @@ fun CopyToDialog(
     categories: List<Category>,
     currentCategoryId: Long,
     isLoading: Boolean = false,
-    title: String = "Copy to",
+    title: String = "复制到",
     onDismiss: () -> Unit,
     onCategorySelected: (Category) -> Unit
 ) {
@@ -46,7 +46,7 @@ fun CopyToDialog(
                             )
                             Spacer(modifier = Modifier.height(16.dp))
                             Text(
-                                text = "Loading folders...",
+                                text = "加载中...",
                                 style = MaterialTheme.typography.bodyMedium,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant
                             )
@@ -62,7 +62,7 @@ fun CopyToDialog(
                         contentAlignment = Alignment.Center
                     ) {
                         Text(
-                            text = "No folders available.\nMake sure storage permission is granted.",
+                            text = "没有可用的文件夹。\n请确认已授予存储权限。",
                             style = MaterialTheme.typography.bodyMedium,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                             textAlign = androidx.compose.ui.text.style.TextAlign.Center
@@ -88,7 +88,7 @@ fun CopyToDialog(
         confirmButton = {},
         dismissButton = {
             TextButton(onClick = onDismiss) {
-                Text("Cancel")
+                Text("取消")
             }
         }
     )

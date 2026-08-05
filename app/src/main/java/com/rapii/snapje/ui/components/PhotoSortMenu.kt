@@ -39,7 +39,7 @@ fun PhotoSortMenu(
                     if (currentSort == option) {
                         Icon(
                             imageVector = Icons.Outlined.CheckCircle,
-                            contentDescription = "Selected"
+                            contentDescription = "已选择"
                         )
                     }
                 }

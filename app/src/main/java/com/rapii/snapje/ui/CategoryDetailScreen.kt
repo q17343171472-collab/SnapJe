@@ -254,10 +254,10 @@ fun CategoryDetailScreen(
                         arrayOf("image/jpeg"),
                         null
                     )
-                    Toast.makeText(context, "Photo cropped successfully", Toast.LENGTH_SHORT).show()
+                    Toast.makeText(context, "照片裁剪成功", Toast.LENGTH_SHORT).show()
                 } catch (e: Exception) {
                     L.e("CropError", "Failed to process cropped image: ${e.message}")
-                    Toast.makeText(context, "Cropped but failed to save", Toast.LENGTH_SHORT).show()
+                    Toast.makeText(context, "裁剪成功但保存失败", Toast.LENGTH_SHORT).show()
                 }
             }
             pendingCropOutputUri = null
@@ -295,11 +295,11 @@ fun CategoryDetailScreen(
                 pendingCropOutputUri = outputUri
                 cropLauncher.launch(intent)
             } else {
-                Toast.makeText(context, "No crop app available", Toast.LENGTH_SHORT).show()
+                Toast.makeText(context, "没有可用的裁剪应用", Toast.LENGTH_SHORT).show()
             }
         } catch (e: Exception) {
             L.e("CropError", "Failed to launch crop: ${e.message}")
-            Toast.makeText(context, "Crop not available: ${e.message}", Toast.LENGTH_LONG).show()
+            Toast.makeText(context, "裁剪不可用：${e.message}", Toast.LENGTH_LONG).show()
         }
     }
 
@@ -359,7 +359,7 @@ fun CategoryDetailScreen(
                 }
 
                 if (photosToConfirm.isNotEmpty()) {
-                    Toast.makeText(context, "${photosToConfirm.size} photos moved to trash", Toast.LENGTH_SHORT).show()
+                    Toast.makeText(context, "${photosToConfirm.size} 张照片已移至回收站", Toast.LENGTH_SHORT).show()
                 }
 
                 pendingDeletePhoto = null
@@ -382,12 +382,12 @@ fun CategoryDetailScreen(
                 photosToConfirm.forEach { pending ->
                     viewModel.removePhotoFromList(pending.photo)
                 }
-                Toast.makeText(context, "${photosToConfirm.size} photos moved to trash", Toast.LENGTH_SHORT).show()
+                Toast.makeText(context, "${photosToConfirm.size} 张照片已移至回收站", Toast.LENGTH_SHORT).show()
             }
 
             // Handle Cancellation
             if (pendingRename != null) {
-                Toast.makeText(context, "Rename cancelled", Toast.LENGTH_SHORT).show()
+                Toast.makeText(context, "重命名已取消", Toast.LENGTH_SHORT).show()
                 pendingRename = null
             } else {
                 val photosToCancel = if (pendingBatchDeletePhotos.isNotEmpty()) {
@@ -399,7 +399,7 @@ fun CategoryDetailScreen(
                 trashRepository.cancelTrashBatch(photosToCancel.map { it.photo })
 
                 if (photosToCancel.isNotEmpty()) {
-                    Toast.makeText(context, "Delete cancelled", Toast.LENGTH_SHORT).show()
+                    Toast.makeText(context, "删除已取消", Toast.LENGTH_SHORT).show()
                 }
 
                 pendingDeletePhoto = null
@@ -423,7 +423,7 @@ fun CategoryDetailScreen(
                 val photo = pendingDeletePhoto!!.photo
                 trashRepository.confirmTrash(photo)
                 viewModel.removePhotoFromList(photo)
-                Toast.makeText(context, "Photo moved to trash", Toast.LENGTH_SHORT).show()
+                Toast.makeText(context, "照片已移至回收站", Toast.LENGTH_SHORT).show()
                 pendingDeletePhoto = null
             }
         }
@@ -524,7 +524,7 @@ fun CategoryDetailScreen(
                         }
                     }
                     withContext(Dispatchers.Main) {
-                        snackbarHostState.showSnackbar("Photo hidden")
+                        snackbarHostState.showSnackbar("照片已隐藏")
                         viewModel.removePhotoFromList(photo)
                     }
                 }
@@ -552,7 +552,7 @@ fun CategoryDetailScreen(
                         try {
                             viewModel.sharePhoto(photo)
                         } catch (e: Exception) {
-                            Toast.makeText(context.applicationContext, "Share failed: ${e.message}", Toast.LENGTH_LONG).show()
+                            Toast.makeText(context.applicationContext, "分享失败：${e.message}", Toast.LENGTH_LONG).show()
                         }
                         return@launch
                     }
@@ -569,7 +569,7 @@ fun CategoryDetailScreen(
                 showOperationsMenu = false
                 selectedPhoto = null
             } catch (e: Exception) {
-                Toast.makeText(context.applicationContext, "Operation failed: ${e.message}", Toast.LENGTH_LONG).show()
+                Toast.makeText(context.applicationContext, "操作失败：${e.message}", Toast.LENGTH_LONG).show()
                 showOperationsMenu = false
                 selectedPhoto = null
             }
@@ -591,7 +591,7 @@ fun CategoryDetailScreen(
                 withContext(Dispatchers.Main) {
                     when (result) {
                         is FileOperationResult.Success -> {
-                            Toast.makeText(context.applicationContext, "Copied to ${destCategory.displayName}", Toast.LENGTH_SHORT).show()
+                            Toast.makeText(context.applicationContext, "已复制到 ${destCategory.displayName}", Toast.LENGTH_SHORT).show()
                             MediaScannerConnection.scanFile(context.applicationContext, arrayOf(destCategory.path), null, null)
                             // Refresh current category to show any changes
                             viewModel.loadPhotos()
@@ -600,7 +600,7 @@ fun CategoryDetailScreen(
                             Toast.makeText(context.applicationContext, result.message, Toast.LENGTH_LONG).show()
                         }
                         is FileOperationResult.NeedsPermission -> {
-                            Toast.makeText(context.applicationContext, "Permission needed", Toast.LENGTH_SHORT).show()
+                            Toast.makeText(context.applicationContext, "需要权限", Toast.LENGTH_SHORT).show()
                         }
                     }
                     showCopyDialog = false
@@ -608,7 +608,7 @@ fun CategoryDetailScreen(
                 }
             } catch (e: Exception) {
                 withContext(Dispatchers.Main) {
-                    Toast.makeText(context.applicationContext, "Copy failed: ${e.message}", Toast.LENGTH_LONG).show()
+                    Toast.makeText(context.applicationContext, "复制失败：${e.message}", Toast.LENGTH_LONG).show()
                     showCopyDialog = false
                     selectedPhoto = null
                 }
@@ -631,7 +631,7 @@ fun CategoryDetailScreen(
                 withContext(Dispatchers.Main) {
                     when (result) {
                         is FileOperationResult.Success -> {
-                            Toast.makeText(context.applicationContext, "Moved to ${destCategory.displayName}", Toast.LENGTH_SHORT).show()
+                            Toast.makeText(context.applicationContext, "已移动到 ${destCategory.displayName}", Toast.LENGTH_SHORT).show()
                             MediaScannerConnection.scanFile(context.applicationContext, arrayOf(destCategory.path), null, null)
                             viewModel.loadPhotos()
                         }
@@ -639,7 +639,7 @@ fun CategoryDetailScreen(
                             Toast.makeText(context.applicationContext, result.message, Toast.LENGTH_LONG).show()
                         }
                         is FileOperationResult.NeedsPermission -> {
-                            Toast.makeText(context.applicationContext, "Permission needed", Toast.LENGTH_SHORT).show()
+                            Toast.makeText(context.applicationContext, "需要权限", Toast.LENGTH_SHORT).show()
                         }
                     }
                     showMoveDialog = false
@@ -647,7 +647,7 @@ fun CategoryDetailScreen(
                 }
             } catch (e: Exception) {
                 withContext(Dispatchers.Main) {
-                    Toast.makeText(context.applicationContext, "Move failed: ${e.message}", Toast.LENGTH_LONG).show()
+                    Toast.makeText(context.applicationContext, "移动失败：${e.message}", Toast.LENGTH_LONG).show()
                     showMoveDialog = false
                     selectedPhoto = null
                 }
@@ -735,7 +735,7 @@ fun CategoryDetailScreen(
                 )
             } else {
                 CategoryDetailTopAppBar(
-                    categoryName = uiState.category?.displayName ?: "Category",
+                    categoryName = uiState.category?.displayName ?: "相册",
                     onBack = onBack,
                     onRefresh = {
                         isRefreshing = true
@@ -843,7 +843,7 @@ fun CategoryDetailScreen(
         CategoryDetailDialogs.CopyToDialog(
             categories = allCategories,
             currentCategoryId = 0L,
-            title = "Copy to",
+            title = "复制到",
             onDismiss = { showCopyDialog = false; selectedPhoto = null },
             onCategorySelected = { handleCopyTo(it) }
         )
@@ -854,7 +854,7 @@ fun CategoryDetailScreen(
         CategoryDetailDialogs.CopyToDialog(
             categories = allCategories,
             currentCategoryId = 0L,
-            title = "Move to",
+            title = "移动到",
             onDismiss = { showMoveDialog = false; selectedPhoto = null },
             onCategorySelected = { handleMoveTo(it) }
         )
@@ -918,7 +918,7 @@ fun CategoryDetailScreen(
                             }
                         } catch (e: Exception) {
                             withContext(Dispatchers.Main) {
-                                Toast.makeText(context.applicationContext, "Rename failed: ${e.message}", Toast.LENGTH_LONG).show()
+                                Toast.makeText(context.applicationContext, "重命名失败：${e.message}", Toast.LENGTH_LONG).show()
                                 showRenameDialog = false
                                 selectedPhoto = null
                             }
@@ -980,7 +980,7 @@ fun CategoryDetailScreen(
                             withContext(Dispatchers.Main) {
                                 when (result) {
                                     is FileOperationResult.Success -> {
-                                        snackbarHostState.showSnackbar("Photo moved to trash")
+                                        snackbarHostState.showSnackbar("照片已移至回收站")
                                         viewModel.removePhotoFromList(photoToDelete)
                                     }
                                     is FileOperationResult.Error -> {

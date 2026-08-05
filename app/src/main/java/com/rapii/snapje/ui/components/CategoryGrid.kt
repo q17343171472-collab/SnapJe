@@ -273,7 +273,7 @@ fun EmptyCategoriesState() {
         contentAlignment = Alignment.Center
     ) {
         Text(
-            text = "No photos yet",
+            text = "还没有照片",
             style = MaterialTheme.typography.bodyLarge,
             color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f)
         )

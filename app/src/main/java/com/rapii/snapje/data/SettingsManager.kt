@@ -48,8 +48,8 @@ class SettingsManager @Inject constructor(
     val settingsFlow: Flow<SettingsState> = context.dataStore.data.map { preferences ->
         SettingsState(
             gridColumns = preferences[SettingsKeys.GRID_COLUMNS] ?: 3,
-            theme = preferences[SettingsKeys.THEME] ?: "System",
-            defaultSort = preferences[SettingsKeys.DEFAULT_SORT] ?: "Date (Newest)",
+            theme = preferences[SettingsKeys.THEME] ?: "跟随系统",
+            defaultSort = preferences[SettingsKeys.DEFAULT_SORT] ?: "最新优先",
             reverseSort = preferences[SettingsKeys.REVERSE_SORT] ?: false,
             cacheSizeMB = preferences[SettingsKeys.CACHE_SIZE_MB] ?: 100
         )

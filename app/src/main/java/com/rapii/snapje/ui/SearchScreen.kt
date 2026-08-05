@@ -96,7 +96,7 @@ fun SearchScreen(
             when {
                 searchState.error != null -> {
                     EmptySearchState(
-                        message = searchState.error ?: "Unknown error",
+                        message = searchState.error ?: "未知错误",
                         modifier = Modifier.align(Alignment.Center)
                     )
                 }
@@ -162,7 +162,7 @@ private fun SearchTextField(
                 IconButton(onClick = { onQueryChange("") }) {
                     Icon(
                         Icons.Default.Clear,
-                        contentDescription = "Clear search"
+                        contentDescription = "清除搜索"
                     )
                 }
             }
@@ -321,7 +321,7 @@ class SearchViewModel @Inject constructor(
             } catch (e: Exception) {
                 _searchState.value = SearchUiState(
                     isLoading = false,
-                    error = e.message ?: "Search failed"
+                    error = e.message ?: "搜索失败"
                 )
             }
         }

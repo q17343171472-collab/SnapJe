@@ -1,7 +1,10 @@
 package com.rapii.snapje.ui
 
 import android.app.Activity
+import android.content.Intent
 import android.net.Uri
+import android.os.Build
+import android.provider.MediaStore
 import android.widget.Toast
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.PickVisualMediaRequest
@@ -99,6 +102,47 @@ fun PhotoXHomeScreen(
     var albumName by remember { mutableStateOf("") }
     var existingAlbums by remember { mutableStateOf(listOf<String>()) }
 
+    // ---- 导入成功后是否删除相册原图 ----
+    var pendingDeleteOriginalUri by remember { mutableStateOf<Uri?>(null) }
+
+    // 删除系统相册原图（Android 11+ 需要用户确认的系统对话框）
+    val deleteOriginalLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.StartActivityForResult()
+    ) { result ->
+        pendingDeleteOriginalUri = null
+        if (result.resultCode == Activity.RESULT_OK) {
+            Toast.makeText(context, R.string.original_deleted, Toast.LENGTH_SHORT).show()
+        } else {
+            Toast.makeText(context, R.string.original_kept, Toast.LENGTH_SHORT).show()
+        }
+    }
+
+    /**
+     * 从手机相册删除原图：
+     * - Android 11+（API 30+）弹系统确认框（MediaStore.createDeleteRequest）
+     * - 更低版本直接删除（manifest 已声明 WRITE_EXTERNAL_STORAGE 最高 API 29）
+     */
+    fun deleteOriginalFromGallery(uri: Uri) {
+        val resolver = context.contentResolver
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+            try {
+                val intent = MediaStore.createDeleteRequest(resolver, listOf(uri))
+                deleteOriginalLauncher.launch(intent)
+            } catch (e: Exception) {
+                // 非 MediaStore URI（如临时文件）直接删
+                runCatching { resolver.delete(uri, null, null) }
+                    .onSuccess { Toast.makeText(context, R.string.original_deleted, Toast.LENGTH_SHORT).show() }
+                    .onFailure { Toast.makeText(context, R.string.original_delete_failed, Toast.LENGTH_LONG).show() }
+                pendingDeleteOriginalUri = null
+            }
+        } else {
+            runCatching { resolver.delete(uri, null, null) }
+                .onSuccess { Toast.makeText(context, R.string.original_deleted, Toast.LENGTH_SHORT).show() }
+                .onFailure { Toast.makeText(context, R.string.original_delete_failed, Toast.LENGTH_LONG).show() }
+            pendingDeleteOriginalUri = null
+        }
+    }
+
     // 系统相册选择（Photo Picker，无需存储权限）
     val photoPicker = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.PickVisualMedia()
@@ -157,6 +201,10 @@ fun PhotoXHomeScreen(
             val result = viewModel.addPhotoToVault(uri, album)
             if (result.isSuccess) {
                 Toast.makeText(context, context.getString(R.string.import_success), Toast.LENGTH_SHORT).show()
+                // 从系统相册导入的：询问是否删除相册原图（相机临时文件会自动清理，不询问）
+                if (uri != pendingCameraUri) {
+                    pendingDeleteOriginalUri = uri
+                }
             } else {
                 Toast.makeText(
                     context,
@@ -231,7 +279,7 @@ fun PhotoXHomeScreen(
                     IconButton(onClick = onNavigateToTrash) {
                         Icon(
                             imageVector = Icons.Outlined.DeleteOutline,
-                            contentDescription = "Recently Deleted",
+                            contentDescription = "最近删除",
                             tint = MaterialTheme.colorScheme.onSurfaceVariant
                         )
                     }
@@ -240,7 +288,7 @@ fun PhotoXHomeScreen(
                         IconButton(onClick = { showSortMenu = true }) {
                             Icon(
                                 imageVector = Icons.Default.MoreVert,
-                                contentDescription = "More",
+                                contentDescription = "更多",
                                 tint = MaterialTheme.colorScheme.onSurfaceVariant
                             )
                         }
@@ -250,7 +298,7 @@ fun PhotoXHomeScreen(
                             onDismissRequest = { showSortMenu = false }
                         ) {
                             DropdownMenuItem(
-                                text = { Text("Settings") },
+                                text = { Text("设置") },
                                 onClick = {
                                     onNavigateToSettings()
                                     showSortMenu = false
@@ -260,28 +308,28 @@ fun PhotoXHomeScreen(
                                 }
                             )
                             DropdownMenuItem(
-                                text = { Text("Recent activity") },
+                                text = { Text("最近活动") },
                                 onClick = {
                                     viewModel.updateSortBy(SortBy.RECENT)
                                     showSortMenu = false
                                 }
                             )
                             DropdownMenuItem(
-                                text = { Text("Name (A-Z)") },
+                                text = { Text("名称 (A-Z)") },
                                 onClick = {
                                     viewModel.updateSortBy(SortBy.NAME)
                                     showSortMenu = false
                                 }
                             )
                             DropdownMenuItem(
-                                text = { Text("Item count") },
+                                text = { Text("项目数量") },
                                 onClick = {
                                     viewModel.updateSortBy(SortBy.COUNT)
                                     showSortMenu = false
                                 }
                             )
                             DropdownMenuItem(
-                                text = { Text("Pinned first") },
+                                text = { Text("置顶优先") },
                                 onClick = {
                                     viewModel.updateSortBy(SortBy.PINNED)
                                     showSortMenu = false
@@ -442,6 +490,28 @@ fun PhotoXHomeScreen(
             dismissButton = {
                 TextButton(onClick = { clearPendingImport() }) {
                     Text(stringResource(R.string.cancel))
+                }
+            }
+        )
+    }
+
+    // 导入成功后：询问是否删除相册原图
+    pendingDeleteOriginalUri?.let { originalUri ->
+        AlertDialog(
+            onDismissRequest = { pendingDeleteOriginalUri = null },
+            title = { Text(stringResource(R.string.delete_original_title)) },
+            text = { Text(stringResource(R.string.delete_original_message)) },
+            confirmButton = {
+                TextButton(onClick = { deleteOriginalFromGallery(originalUri) }) {
+                    Text(stringResource(R.string.delete_original_confirm))
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = {
+                    pendingDeleteOriginalUri = null
+                    Toast.makeText(context, R.string.original_kept, Toast.LENGTH_SHORT).show()
+                }) {
+                    Text(stringResource(R.string.delete_original_keep))
                 }
             }
         )

@@ -77,7 +77,7 @@ fun CategoryPhotoGridItemWithLongPress(
                 ) {
                     Icon(
                         imageVector = Icons.Outlined.CheckCircle,
-                        contentDescription = "Selected",
+                        contentDescription = "已选择",
                         tint = MaterialTheme.colorScheme.primary,
                         modifier = Modifier.size(24.dp)
                     )

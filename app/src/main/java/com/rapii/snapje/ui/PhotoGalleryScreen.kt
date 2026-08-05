@@ -124,7 +124,7 @@ fun PhotoGalleryScreen(
         contract = ActivityResultContracts.StartActivityForResult()
     ) { result ->
         if (result.resultCode == Activity.RESULT_OK) {
-            Toast.makeText(context, "Photo cropped successfully", Toast.LENGTH_SHORT).show()
+            Toast.makeText(context, "照片裁剪成功", Toast.LENGTH_SHORT).show()
         }
     }
     
@@ -144,7 +144,7 @@ fun PhotoGalleryScreen(
             }
             cropLauncher.launch(intent)
         } catch (e: Exception) {
-            Toast.makeText(context, "Crop not available on this device", Toast.LENGTH_SHORT).show()
+            Toast.makeText(context, "此设备不支持裁剪", Toast.LENGTH_SHORT).show()
         }
     }
     data class PendingRename(val photo: PhotoItem, val newName: String)
@@ -159,7 +159,7 @@ fun PhotoGalleryScreen(
                 scope.launch {
                     when (val renameResult = fileOperations.renamePhoto(pending.photo, pending.newName)) {
                         is FileOperationResult.Success -> {
-                            Toast.makeText(context, "Photo renamed", Toast.LENGTH_SHORT).show()
+                            Toast.makeText(context, "照片已重命名", Toast.LENGTH_SHORT).show()
                         }
                         is FileOperationResult.Error -> {
                             Toast.makeText(context, renameResult.message, Toast.LENGTH_SHORT).show()
@@ -173,7 +173,7 @@ fun PhotoGalleryScreen(
                     scope.launch {
                         when (val deleteResult = trashRepository.moveToTrash(photo)) {
                             is FileOperationResult.Success -> {
-                                Toast.makeText(context, "Photo moved to trash", Toast.LENGTH_SHORT).show()
+                                Toast.makeText(context, "照片已移至回收站", Toast.LENGTH_SHORT).show()
                             }
                             is FileOperationResult.Error -> {
                                 Toast.makeText(context, deleteResult.message, Toast.LENGTH_SHORT).show()
@@ -185,7 +185,7 @@ fun PhotoGalleryScreen(
                 }
             }
         } else {
-            Toast.makeText(context, "Operation cancelled", Toast.LENGTH_SHORT).show()
+            Toast.makeText(context, "操作已取消", Toast.LENGTH_SHORT).show()
             pendingRename = null
             pendingDeletePhoto = null
         }
@@ -211,20 +211,20 @@ fun PhotoGalleryScreen(
                 },
                 navigationIcon = {
                     IconButton(onClick = onBack) {
-                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back", tint = Color.White)
+                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "返回", tint = Color.White)
                     }
                 },
                 actions = {
                     IconButton(onClick = { showInfo = !showInfo }) {
-                        Icon(Icons.Default.Info, contentDescription = "Photo info", tint = Color.White)
+                        Icon(Icons.Default.Info, contentDescription = "照片信息", tint = Color.White)
                     }
                     currentPhoto?.let { photo ->
                         IconButton(onClick = { onShare(photo) }) {
-                            Icon(Icons.Default.Share, contentDescription = "Share photo", tint = Color.White)
+                            Icon(Icons.Default.Share, contentDescription = "分享照片", tint = Color.White)
                         }
                     }
                     IconButton(onClick = { showOperationsMenu = true }) {
-                        Icon(Icons.Default.MoreVert, contentDescription = "More options", tint = Color.White)
+                        Icon(Icons.Default.MoreVert, contentDescription = "更多选项", tint = Color.White)
                     }
                 },
                 colors = TopAppBarDefaults.topAppBarColors(containerColor = Color.Black.copy(alpha = 0.6f))
@@ -295,7 +295,7 @@ fun PhotoGalleryScreen(
                                 scope.launch {
                                     when (val result = trashRepository.moveToTrash(currentPhoto)) {
                                         is FileOperationResult.Success -> {
-                                            Toast.makeText(context, "Photo moved to trash", Toast.LENGTH_SHORT).show()
+                                            Toast.makeText(context, "照片已移至回收站", Toast.LENGTH_SHORT).show()
                                         }
                                         is FileOperationResult.Error -> {
                                             Toast.makeText(context, result.message, Toast.LENGTH_SHORT).show()
@@ -367,7 +367,7 @@ fun PhotoGalleryScreen(
                         scope.launch {
                             when (val result = fileOperations.renamePhoto(photo, newName)) {
                                 is FileOperationResult.Success -> {
-                                    Toast.makeText(context, "File renamed successfully", Toast.LENGTH_SHORT).show()
+                                    Toast.makeText(context, "文件重命名成功", Toast.LENGTH_SHORT).show()
                                 }
                                 is FileOperationResult.Error -> {
                                     Toast.makeText(context, result.message, Toast.LENGTH_SHORT).show()
@@ -391,14 +391,14 @@ fun PhotoGalleryScreen(
                     categories = categories,
                     currentCategoryId = currentPhoto.bucketId ?: -1L,
                     isLoading = isLoadingCategories,
-                    title = "Copy to",
+                    title = "复制到",
                     onDismiss = { showCopyDialog = false },
                     onCategorySelected = { targetCategory ->
                         showCopyDialog = false
                         scope.launch {
                             val result = fileOperations.copyPhoto(currentPhoto, targetCategory.id)
                             if (result is FileOperationResult.Success) {
-                                Toast.makeText(context, "File copied to ${targetCategory.displayName}", Toast.LENGTH_SHORT).show()
+                                Toast.makeText(context, "已复制到 ${targetCategory.displayName}", Toast.LENGTH_SHORT).show()
                             } else if (result is FileOperationResult.Error) {
                                 Toast.makeText(context, result.message, Toast.LENGTH_SHORT).show()
                             }
@@ -413,14 +413,14 @@ fun PhotoGalleryScreen(
                     categories = categories,
                     currentCategoryId = currentPhoto.bucketId ?: -1L,
                     isLoading = isLoadingCategories,
-                    title = "Move to",
+                    title = "移动到",
                     onDismiss = { showMoveDialog = false },
                     onCategorySelected = { targetCategory ->
                         showMoveDialog = false
                         scope.launch {
                             val result = fileOperations.movePhoto(currentPhoto, targetCategory.id)
                             if (result is FileOperationResult.Success) {
-                                Toast.makeText(context, "File moved to ${targetCategory.displayName}", Toast.LENGTH_SHORT).show()
+                                Toast.makeText(context, "已移动到 ${targetCategory.displayName}", Toast.LENGTH_SHORT).show()
                             } else if (result is FileOperationResult.Error) {
                                 Toast.makeText(context, result.message, Toast.LENGTH_SHORT).show()
                             } else if (result is FileOperationResult.NeedsPermission) {
@@ -631,31 +631,31 @@ fun GalleryPhotoInfoOverlay(
                 modifier = Modifier.fillMaxWidth()
             ) {
                 Text(
-                    text = "Photo Details",
+                    text = "照片详情",
                     style = MaterialTheme.typography.titleMedium,
                     color = Color.White
                 )
                 IconButton(onClick = onClose) {
-                    Icon(Icons.Default.Close, contentDescription = "Close", tint = Color.White)
+                    Icon(Icons.Default.Close, contentDescription = "关闭", tint = Color.White)
                 }
             }
 
             Spacer(modifier = Modifier.height(8.dp))
 
-            InfoRow(label = "Filename", value = photo.displayName)
+            InfoRow(label = "文件名", value = photo.displayName)
             InfoRow(label = "Uri", value = photo.uri.toString())
 
             // MediaStore DATE_TAKEN / VaultPhoto.dateTaken 均为毫秒时间戳，勿再乘 1000
             val dateText = if (photo.dateTaken > 0) {
-                SimpleDateFormat("MMM dd, yyyy HH:mm", Locale.getDefault())
+                SimpleDateFormat("yyyy/MM/dd HH:mm", Locale.getDefault())
                     .format(Date(photo.dateTaken))
             } else {
-                "Unknown"
+                "未知"
             }
-            InfoRow(label = "Date", value = dateText)
+            InfoRow(label = "日期", value = dateText)
 
-            InfoRow(label = "Size", value = formatFileSize(photo.size))
-            InfoRow(label = "Mime Type", value = photo.mimeType)
+            InfoRow(label = "大小", value = formatFileSize(photo.size))
+            InfoRow(label = "类型", value = photo.mimeType)
         }
     }
 }

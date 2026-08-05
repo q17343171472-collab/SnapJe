@@ -24,7 +24,7 @@ fun RenameDialog(
     AlertDialog(
         onDismissRequest = onDismiss,
         title = {
-            Text(text = "Rename Photo")
+            Text(text = "重命名照片")
         },
         text = {
             Column {
@@ -34,11 +34,11 @@ fun RenameDialog(
                         newName = it
                         showError = false  // Clear error when user types
                     },
-                    label = { Text("New name") },
+                    label = { Text("新名称") },
                     singleLine = true,
                     isError = showError,
                     supportingText = if (showError) {
-                        { Text(errorMessage ?: "Invalid name") }
+                        { Text(errorMessage ?: "名称无效") }
                     } else null,
                     modifier = Modifier.fillMaxWidth()
                 )
@@ -58,12 +58,12 @@ fun RenameDialog(
                 },
                 enabled = newName.isNotBlank() && newName != currentName && !showError
             ) {
-                Text("Rename")
+                Text("重命名")
             }
         },
         dismissButton = {
             TextButton(onClick = onDismiss) {
-                Text("Cancel")
+                Text("取消")
             }
         }
     )

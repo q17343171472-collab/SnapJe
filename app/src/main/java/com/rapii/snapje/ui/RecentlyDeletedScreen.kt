@@ -52,7 +52,7 @@ fun RecentlyDeletedScreen(
             // Permission granted - confirm restore
             pendingRestorePhoto?.let { photo ->
                 viewModel.confirmRestore(photo)
-                Toast.makeText(context, "Photo restored", Toast.LENGTH_SHORT).show()
+                Toast.makeText(context, "照片已恢复", Toast.LENGTH_SHORT).show()
                 // CRITICAL: Notify parent that photo was restored so category can update
                 onPhotoRestored?.invoke(photo)
             }
@@ -61,7 +61,7 @@ fun RecentlyDeletedScreen(
             pendingRestorePhoto?.let { photo ->
                 viewModel.cancelRestore(photo)
             }
-            Toast.makeText(context, "Restore cancelled", Toast.LENGTH_SHORT).show()
+            Toast.makeText(context, "恢复已取消", Toast.LENGTH_SHORT).show()
         }
         pendingRestorePhoto = null
     }
@@ -110,7 +110,7 @@ fun RecentlyDeletedScreen(
                                     when (result) {
                                         is FileOperationResult.Success -> {
                                             // Restore completed immediately (no permission needed)
-                                            Toast.makeText(context, "Photo restored", Toast.LENGTH_SHORT).show()
+                                            Toast.makeText(context, "照片已恢复", Toast.LENGTH_SHORT).show()
                                             // CRITICAL: Notify parent that photo was restored
                                             onPhotoRestored?.invoke(photo)
                                         }
@@ -133,7 +133,7 @@ fun RecentlyDeletedScreen(
                                     val message = when (result) {
                                         is FileOperationResult.Success -> context.getString(R.string.permanently_deleted_toast)
                                         is FileOperationResult.Error -> result.message
-                                        else -> "Operation failed"
+                                        else -> "操作失败"
                                     }
                                     Toast.makeText(context, message, Toast.LENGTH_SHORT).show()
                                 }
@@ -192,14 +192,14 @@ private fun TrashedPhotoItem(
             IconButton(onClick = onRestore) {
                 Icon(
                     imageVector = Icons.Default.Restore,
-                    contentDescription = "Restore",
+                    contentDescription = "恢复",
                     modifier = Modifier.size(24.dp)
                 )
             }
             IconButton(onClick = onDelete) {
                 Icon(
                     imageVector = Icons.Default.Delete,
-                    contentDescription = "Delete",
+                    contentDescription = "删除",
                     modifier = Modifier.size(24.dp),
                     tint = MaterialTheme.colorScheme.error
                 )

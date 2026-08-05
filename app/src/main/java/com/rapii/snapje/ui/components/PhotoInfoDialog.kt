@@ -20,22 +20,22 @@ fun PhotoInfoDialog(
     AlertDialog(
         onDismissRequest = onDismiss,
         title = {
-            Text(text = "Photo Info")
+            Text(text = "照片信息")
         },
         text = {
             Column(
                 modifier = Modifier.fillMaxWidth()
             ) {
-                InfoRow(label = "Name", value = photoInfo.name)
-                InfoRow(label = "Path", value = photoInfo.path)
-                InfoRow(label = "Size", value = photoInfo.size)
-                InfoRow(label = "Dimensions", value = photoInfo.dimensions)
-                InfoRow(label = "Date Taken", value = photoInfo.dateTaken)
+                InfoRow(label = "名称", value = photoInfo.name)
+                InfoRow(label = "路径", value = photoInfo.path)
+                InfoRow(label = "大小", value = photoInfo.size)
+                InfoRow(label = "尺寸", value = photoInfo.dimensions)
+                InfoRow(label = "拍摄日期", value = photoInfo.dateTaken)
             }
         },
         confirmButton = {
             TextButton(onClick = onDismiss) {
-                Text("Close")
+                Text("关闭")
             }
         }
     )
