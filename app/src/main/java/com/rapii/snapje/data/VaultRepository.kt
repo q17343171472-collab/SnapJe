@@ -372,9 +372,13 @@ class VaultRepository @Inject constructor(
      */
     private fun generateVideoThumbnail(bytes: ByteArray): ByteArray? {
         var retriever: android.media.MediaMetadataRetriever? = null
+        var tmp: File? = null
         return try {
+            // MediaMetadataRetriever 不支持 InputStream，先落临时文件再取帧
+            tmp = File(context.cacheDir, "vthumb_${System.currentTimeMillis()}.mp4")
+            tmp!!.writeBytes(bytes)
             retriever = android.media.MediaMetadataRetriever()
-            retriever.setDataSource(ByteArrayInputStream(bytes))
+            retriever.setDataSource(tmp!!.absolutePath)
             val frame = retriever.frameAtTime ?: return null
             generateThumbnailFromBitmap(frame)
         } catch (e: Exception) {
@@ -382,6 +386,7 @@ class VaultRepository @Inject constructor(
             null
         } finally {
             runCatching { retriever?.release() }
+            runCatching { tmp?.delete() }
         }
     }
 

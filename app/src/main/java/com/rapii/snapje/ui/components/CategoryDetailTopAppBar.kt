@@ -4,6 +4,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Refresh
+import androidx.compose.material.icons.filled.SaveAlt
 import androidx.compose.material.icons.outlined.Delete
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
@@ -66,6 +67,7 @@ fun CategoryDetailSelectionTopAppBar(
     canDelete: Boolean,
     onCancel: () -> Unit,
     onDelete: () -> Unit,
+    onSave: (() -> Unit)? = null,
     modifier: Modifier = Modifier
 ) {
     TopAppBar(
@@ -84,6 +86,23 @@ fun CategoryDetailSelectionTopAppBar(
             }
         },
         actions = {
+            // 保存到系统相册（保险库照片）
+            if (onSave != null) {
+                IconButton(
+                    onClick = onSave,
+                    enabled = canDelete
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.SaveAlt,
+                        contentDescription = "保存到相册",
+                        tint = if (canDelete) {
+                            MaterialTheme.colorScheme.primary
+                        } else {
+                            MaterialTheme.colorScheme.onSurface.copy(alpha = 0.38f)
+                        }
+                    )
+                }
+            }
             IconButton(
                 onClick = onDelete,
                 enabled = canDelete

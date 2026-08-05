@@ -347,22 +347,6 @@ fun CategoryDetailScreen(
         }
     }
 
-    // 批量导出选中项
-    fun handleBatchExport() {
-        val photos = selectedPhotos.toList()
-        if (photos.isEmpty()) return
-        scope.launch {
-            val count = viewModel.exportVaultPhotos(photos)
-            Toast.makeText(
-                context,
-                if (count > 0) "已保存 $count 项到相册" else "保存失败，请检查存储权限",
-                Toast.LENGTH_LONG
-            ).show()
-            isSelectionMode = false
-            selectedPhotos = emptySet()
-        }
-    }
-
     // 播放保险库视频（解密后交给系统播放器）
     fun playVideo(photo: PhotoItem) {
         scope.launch {
@@ -599,6 +583,22 @@ fun CategoryDetailScreen(
     var isSelectionMode by remember { mutableStateOf(false) }
     var selectedPhotos by remember { mutableStateOf<Set<PhotoItem>>(emptySet()) }
     var isRefreshing by remember { mutableStateOf(false) }
+
+    // 批量导出选中的保险库照片/视频到系统相册
+    fun handleBatchExport() {
+        val photos = selectedPhotos.toList()
+        if (photos.isEmpty()) return
+        scope.launch {
+            val count = viewModel.exportVaultPhotos(photos)
+            Toast.makeText(
+                context,
+                if (count > 0) "已保存 $count 项到相册" else "保存失败，请检查存储权限",
+                Toast.LENGTH_LONG
+            ).show()
+            isSelectionMode = false
+            selectedPhotos = emptySet()
+        }
+    }
 
     // Snackbar state
     val snackbarHostState = remember { SnackbarHostState() }
