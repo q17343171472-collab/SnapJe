@@ -189,85 +189,8 @@ fun CategoryDetailScreen(
     // 删除原图相关（支持批量）
     var pendingDeleteOriginalUris by remember { mutableStateOf<List<Uri>>(emptyList()) }
 
-    // 选择照片/视频（直接调起系统 Gallery，支持长按+滑动手势多选）
-    val galleryLauncher = rememberLauncherForActivityResult(
-        contract = ActivityResultContracts.StartActivityForResult()
-    ) { result ->
-        if (result.resultCode == Activity.RESULT_OK) {
-            val data = result.data ?: return@rememberLauncherForActivityResult
-            val uris = mutableListOf<Uri>()
-            // 多选：从 clipData 取
-            data.clipData?.let { clipData ->
-                for (i in 0 until clipData.itemCount) {
-                    uris.add(clipData.getItemAt(i).uri)
-                }
-            }
-            // 单选：从 data 取
-            data.data?.let { uris.add(it) }
-            if (uris.isNotEmpty()) {
-                pendingImportUris = uris
-                // 分组内导入：直接导入当前分组，不再弹确认框
-                albumName = uiState.category?.displayName ?: "我的保险库"
-                performImportBatch(uris, albumName)
-            }
-        }
-    }
-
-    /**
-     * 备用方案：ACTION_OPEN_DOCUMENT 的 launcher（通用文件选择器，直接返回 Uri 列表）。
-     */
-    val openDocumentLauncher = rememberLauncherForActivityResult(
-        contract = ActivityResultContracts.OpenMultipleDocuments()
-    ) { uris ->
-        if (uris.isNotEmpty()) {
-            pendingImportUris = uris
-            // 分组内导入：直接导入当前分组，不再弹确认框
-            albumName = uiState.category?.displayName ?: "我的保险库"
-            performImportBatch(uris, albumName)
-        }
-    }
-
-    /**
-     * 打开系统原生相册（ACTION_PICK + Images 表，绝大多数设备支持；仅图片，不含视频）。
-     */
-    fun launchSystemGallery() {
-        // 用 Images 表：之前验证可正常启动，只是不含视频；
-        // 若仍找不到处理者则回退到文件选择器，不闪退。
-        val pickIntent = Intent(
-            Intent.ACTION_PICK,
-            MediaStore.Images.Media.EXTERNAL_CONTENT_URI
-        ).apply {
-            putExtra(Intent.EXTRA_ALLOW_MULTIPLE, true)
-        }
-        if (pickIntent.resolveActivity(context.packageManager) != null) {
-            galleryLauncher.launch(pickIntent)
-        } else {
-            Toast.makeText(context, "当前设备不支持系统相册，请改用文件选择器", Toast.LENGTH_LONG).show()
-        }
-    }
-
-    /**
-     * 打开系统文件选择器（ACTION_OPEN_DOCUMENT，所有设备可用，勾选多选）。
-     */
-    fun launchFilePicker() {
-        openDocumentLauncher.launch(arrayOf("image/*", "video/*"))
-    }
-
     // 相机
     val cameraLauncher = remember { CameraLauncher() }
-    val cameraResultLauncher = rememberLauncherForActivityResult(
-        contract = ActivityResultContracts.StartActivityForResult()
-    ) { result ->
-        val uri = cameraLauncher.getLastPhotoUri()
-        if (result.resultCode == Activity.RESULT_OK && uri != null) {
-            pendingCameraUri = uri
-            // 分组内拍照：直接导入当前分组，不再弹确认框
-            albumName = uiState.category?.displayName ?: "我的保险库"
-            performImportBatch(listOf(uri), albumName)
-        } else {
-            cameraLauncher.clearPhotoUri()
-        }
-    }
 
     // 删除相册原图（Android 11+ 弹系统确认框，支持批量）
     val deleteOriginalLauncher = rememberLauncherForActivityResult(
@@ -279,15 +202,6 @@ fun CategoryDetailScreen(
             if (result.resultCode == Activity.RESULT_OK) R.string.original_deleted else R.string.original_kept,
             Toast.LENGTH_SHORT
         ).show()
-    }
-
-    fun launchCamera() {
-        runCatching {
-            cameraResultLauncher.launch(cameraLauncher.createCaptureIntent(context))
-        }.onFailure { e ->
-            L.e("CategoryDetail", "Camera launch failed: ${e.message}")
-            Toast.makeText(context, "无法打开相机", Toast.LENGTH_SHORT).show()
-        }
     }
 
     fun cleanupCameraFile() {
@@ -349,13 +263,7 @@ fun CategoryDetailScreen(
         pendingDeleteOriginalUris = emptyList()
     }
 
-    // 分组内导入：默认归入当前相册分组
-    fun clearPendingImport() {
-        pendingImportUris = emptyList()
-        cleanupCameraFile()
-        showImportSheet = false
-    }
-
+    // 分组内导入：直接导入当前分组，不再弹确认框
     fun performImportBatch(uris: List<Uri>, album: String) {
         if (uris.isEmpty()) return
         if (isImporting) return
@@ -394,6 +302,101 @@ fun CategoryDetailScreen(
                 ).show()
             }
             cleanupCameraFile()
+        }
+    }
+
+    // 清除待导入状态
+    fun clearPendingImport() {
+        pendingImportUris = emptyList()
+        cleanupCameraFile()
+        showImportSheet = false
+    }
+
+    // 选择照片/视频（直接调起系统 Gallery，支持长按+滑动手势多选）
+    val galleryLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.StartActivityForResult()
+    ) { result ->
+        if (result.resultCode == Activity.RESULT_OK) {
+            val data = result.data ?: return@rememberLauncherForActivityResult
+            val uris = mutableListOf<Uri>()
+            // 多选：从 clipData 取
+            data.clipData?.let { clipData ->
+                for (i in 0 until clipData.itemCount) {
+                    uris.add(clipData.getItemAt(i).uri)
+                }
+            }
+            // 单选：从 data 取
+            data.data?.let { uris.add(it) }
+            if (uris.isNotEmpty()) {
+                pendingImportUris = uris
+                // 分组内导入：直接导入当前分组，不再弹确认框
+                albumName = uiState.category?.displayName ?: "我的保险库"
+                performImportBatch(uris, albumName)
+            }
+        }
+    }
+
+    /**
+     * 备用方案：ACTION_OPEN_DOCUMENT 的 launcher（通用文件选择器，直接返回 Uri 列表）。
+     */
+    val openDocumentLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.OpenMultipleDocuments()
+    ) { uris ->
+        if (uris.isNotEmpty()) {
+            pendingImportUris = uris
+            // 分组内导入：直接导入当前分组，不再弹确认框
+            albumName = uiState.category?.displayName ?: "我的保险库"
+            performImportBatch(uris, albumName)
+        }
+    }
+
+    // 相机结果：拍照后直接导入当前分组
+    val cameraResultLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.StartActivityForResult()
+    ) { result ->
+        val uri = cameraLauncher.getLastPhotoUri()
+        if (result.resultCode == Activity.RESULT_OK && uri != null) {
+            pendingCameraUri = uri
+            // 分组内拍照：直接导入当前分组，不再弹确认框
+            albumName = uiState.category?.displayName ?: "我的保险库"
+            performImportBatch(listOf(uri), albumName)
+        } else {
+            cameraLauncher.clearPhotoUri()
+        }
+    }
+
+    /**
+     * 打开系统原生相册（ACTION_PICK + Images 表，绝大多数设备支持；仅图片，不含视频）。
+     */
+    fun launchSystemGallery() {
+        // 用 Images 表：之前验证可正常启动，只是不含视频；
+        // 若仍找不到处理者则回退到文件选择器，不闪退。
+        val pickIntent = Intent(
+            Intent.ACTION_PICK,
+            MediaStore.Images.Media.EXTERNAL_CONTENT_URI
+        ).apply {
+            putExtra(Intent.EXTRA_ALLOW_MULTIPLE, true)
+        }
+        if (pickIntent.resolveActivity(context.packageManager) != null) {
+            galleryLauncher.launch(pickIntent)
+        } else {
+            Toast.makeText(context, "当前设备不支持系统相册，请改用文件选择器", Toast.LENGTH_LONG).show()
+        }
+    }
+
+    /**
+     * 打开系统文件选择器（ACTION_OPEN_DOCUMENT，所有设备可用，勾选多选）。
+     */
+    fun launchFilePicker() {
+        openDocumentLauncher.launch(arrayOf("image/*", "video/*"))
+    }
+
+    fun launchCamera() {
+        runCatching {
+            cameraResultLauncher.launch(cameraLauncher.createCaptureIntent(context))
+        }.onFailure { e ->
+            L.e("CategoryDetail", "Camera launch failed: ${e.message}")
+            Toast.makeText(context, "无法打开相机", Toast.LENGTH_SHORT).show()
         }
     }
 
