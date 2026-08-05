@@ -1,6 +1,7 @@
 package com.rapii.snapje.ui.screens
 
 import androidx.activity.compose.BackHandler
+import androidx.biometric.BiometricManager
 import androidx.biometric.BiometricPrompt
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -55,9 +56,13 @@ fun AuthScreen(
 ) {
     val context = LocalContext.current
     val fragmentActivity = remember { context as? FragmentActivity }
-    val biometricAvailable = remember(fragmentActivity) {
-        fragmentActivity?.let { BiometricAuthManager.isAvailable(it) } ?: false
+    // 生物识别状态码：BIOMETRIC_SUCCESS=已录入可用；BIOMETRIC_ERROR_NONE_ENROLLED=有硬件但未录入；其他=无硬件/不可用
+    val bioAvailability = remember(fragmentActivity) {
+        fragmentActivity?.let { BiometricAuthManager.getAvailability(it) }
+            ?: BiometricManager.BIOMETRIC_ERROR_NO_HARDWARE
     }
+    val hasEnrolledBiometric = bioAvailability == BiometricManager.BIOMETRIC_SUCCESS
+    val hasHardwareButNotEnrolled = bioAvailability == BiometricManager.BIOMETRIC_ERROR_NONE_ENROLLED
 
     var isAuthenticating by remember { mutableStateOf(false) }
     var errorMessage by remember { mutableStateOf<String?>(null) }
@@ -119,8 +124,8 @@ fun AuthScreen(
     // 延迟 600ms 等窗口/ Fragment 就绪后再弹，避免冷启动时崩溃。
     val lifecycleOwner = LocalLifecycleOwner.current
     val lifecycleState by lifecycleOwner.lifecycle.currentStateAsState()
-    LaunchedEffect(lifecycleState, fragmentActivity, biometricAvailable) {
-        if (lifecycleState == Lifecycle.State.RESUMED && biometricAvailable && !hasAutoAttempted) {
+    LaunchedEffect(lifecycleState, fragmentActivity, hasEnrolledBiometric) {
+        if (lifecycleState == Lifecycle.State.RESUMED && hasEnrolledBiometric && !hasAutoAttempted) {
             hasAutoAttempted = true
             delay(600)
             safeAuthenticate()
@@ -151,7 +156,7 @@ fun AuthScreen(
             )
             Spacer(modifier = Modifier.height(8.dp))
 
-            if (biometricAvailable) {
+            if (hasEnrolledBiometric) {
                 Text(
                     text = authRequired,
                     style = MaterialTheme.typography.bodyLarge,
@@ -191,24 +196,35 @@ fun AuthScreen(
                     )
                 }
             } else {
-                Text(
-                    text = "设备未设置指纹或面部解锁\n无法验证，请先到手机系统设置中录入指纹/面部，\n或选择跳过验证直接进入",
-                    style = MaterialTheme.typography.bodyLarge,
-                    color = MaterialTheme.colorScheme.error,
-                    textAlign = TextAlign.Center
-                )
-                Spacer(modifier = Modifier.height(24.dp))
-                Button(onClick = {
-                    // 打开系统安全设置，引导用户录入指纹/面部
-                    runCatching {
-                        context.startActivity(Intent(Settings.ACTION_BIOMETRIC_ENROLL))
-                    }.onFailure {
+                if (hasHardwareButNotEnrolled) {
+                    // 手机有指纹/面部功能，但用户还没在系统里录入
+                    Text(
+                        text = "检测到您的手机支持指纹/面部解锁，\n但您还没有在手机系统里录入指纹或面部。\n\n请先点击下方按钮去录入，录入完成后\n返回本 App 即可使用验证功能。",
+                        style = MaterialTheme.typography.bodyLarge,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        textAlign = TextAlign.Center
+                    )
+                    Spacer(modifier = Modifier.height(24.dp))
+                    Button(onClick = {
+                        // 打开系统生物识别录入界面
                         runCatching {
-                            context.startActivity(Intent(Settings.ACTION_SECURITY_SETTINGS))
+                            context.startActivity(Intent(Settings.ACTION_BIOMETRIC_ENROLL))
+                        }.onFailure {
+                            runCatching {
+                                context.startActivity(Intent(Settings.ACTION_SECURITY_SETTINGS))
+                            }
                         }
+                    }) {
+                        Text("去设置指纹/面部")
                     }
-                }) {
-                    Text("去设置指纹/面部")
+                } else {
+                    // 设备完全没有指纹/面部硬件，或不可用
+                    Text(
+                        text = "当前设备不支持指纹/面部解锁，\n无法使用验证功能。",
+                        style = MaterialTheme.typography.bodyLarge,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        textAlign = TextAlign.Center
+                    )
                 }
                 Spacer(modifier = Modifier.height(8.dp))
                 OutlinedButton(onClick = onSkip) {

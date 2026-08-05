@@ -42,6 +42,9 @@ class MainActivity : FragmentActivity() {
     /** 是否已通过生物识别解锁（false 时 AuthScreen 全屏覆盖） */
     private var isUnlocked by mutableStateOf(false)
 
+    /** 用户是否启用了生物识别验证（设置里可关；关闭后不再上锁） */
+    private var biometricEnabled by mutableStateOf(true)
+
     @Inject
     lateinit var settingsManager: SettingsManager
 
@@ -54,9 +57,10 @@ class MainActivity : FragmentActivity() {
 
         super.onCreate(savedInstanceState)
 
-        // 用户已在设置中关闭生物识别验证：启动直接进入，不显示验证页
+        // 读取用户设置：若已关闭生物识别验证，则启动直接进入、不再上锁
         lifecycleScope.launch {
-            if (!settingsManager.isBiometricEnabled()) {
+            biometricEnabled = settingsManager.isBiometricEnabled()
+            if (!biometricEnabled) {
                 isUnlocked = true
             }
         }
@@ -85,14 +89,15 @@ class MainActivity : FragmentActivity() {
                     GalleryNavGraph(navController = navController)
 
                     // 上锁时用全屏 AuthScreen 覆盖（盖在最上层）
-                    if (!isUnlocked) {
+                    if (!isUnlocked && biometricEnabled) {
                         AuthScreen(
                             onUnlocked = { isUnlocked = true },
                             onSkip = {
-                                // 设备无生物识别且用户选择跳过：记住选择，之后启动不再验证
+                                // 用户选择跳过验证：记住选择，之后启动/回前台都不再验证
                                 lifecycleScope.launch {
                                     settingsManager.setBiometricEnabled(false)
                                 }
+                                biometricEnabled = false
                                 isUnlocked = true
                             },
                             onExit = { finish() }
@@ -105,8 +110,9 @@ class MainActivity : FragmentActivity() {
 
     override fun onStop() {
         super.onStop()
-        // App 退到后台即重新上锁（配置变更除外，避免旋转屏幕时重新验证）
-        if (!isChangingConfigurations) {
+        // App 退到后台即重新上锁（配置变更除外，避免旋转屏幕时重新验证）。
+        // 仅当用户启用了生物识别验证时才上锁；跳过后不再反复弹验证。
+        if (biometricEnabled && !isChangingConfigurations) {
             isUnlocked = false
             // 清理 Coil 磁盘缓存中的可能明文残留（保险库加载器本身已禁用磁盘缓存）
             runCatching { ImageLoaderFactory.clearAllDiskCaches(this) }

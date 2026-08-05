@@ -66,7 +66,7 @@ object BiometricAuthManager {
     }
 
     /**
-     * 设备是否配置了可用的生物识别。
+     * 设备是否配置了可用的生物识别（已录入指纹/面部）。
      */
     fun isAvailable(activity: FragmentActivity): Boolean {
         return when (BiometricManager.from(activity).canAuthenticate(
@@ -76,5 +76,16 @@ object BiometricAuthManager {
             BiometricManager.BIOMETRIC_SUCCESS -> true
             else -> false
         }
+    }
+
+    /**
+     * 获取生物识别可用状态码（区分"已录入" / "有硬件但未录入" / "无硬件"）。
+     * 返回 BiometricManager.BIOMETRIC_* 常量。
+     */
+    fun getAvailability(activity: FragmentActivity): Int {
+        return BiometricManager.from(activity).canAuthenticate(
+            BiometricManager.Authenticators.BIOMETRIC_STRONG or
+                BiometricManager.Authenticators.BIOMETRIC_WEAK
+        )
     }
 }
