@@ -27,6 +27,7 @@ import androidx.compose.material.icons.filled.CameraAlt
 import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.outlined.DeleteOutline
+import androidx.compose.material.icons.outlined.FolderOpen
 import androidx.compose.material.icons.outlined.PhotoLibrary
 import androidx.compose.material.icons.outlined.Search
 import androidx.compose.material3.AlertDialog
@@ -223,12 +224,10 @@ fun PhotoXHomeScreen(
     }
 
     /**
-     * 调起系统相册选择（图片+视频，多选）。
-     * 优先用 ACTION_PICK（厂商相册，支持长按滑动手势多选）；
-     * 若设备不支持则回退到 ACTION_OPEN_DOCUMENT（通用文件选择器），避免闪退。
+     * 打开系统原生相册（ACTION_PICK，支持长按+滑动手势多选）。
+     * 若设备不支持会提示用户改用文件选择器，不会闪退。
      */
-    fun launchGalleryPicker() {
-        // 方案 1：ACTION_PICK 系统相册
+    fun launchSystemGallery() {
         val pickIntent = Intent(
             Intent.ACTION_PICK,
             MediaStore.Files.getContentUri(MediaStore.VOLUME_EXTERNAL)
@@ -238,9 +237,15 @@ fun PhotoXHomeScreen(
         }
         if (pickIntent.resolveActivity(context.packageManager) != null) {
             galleryLauncher.launch(pickIntent)
-            return
+        } else {
+            Toast.makeText(context, "当前设备不支持系统相册，请改用文件选择器", Toast.LENGTH_LONG).show()
         }
-        // 方案 2：ACTION_OPEN_DOCUMENT（通用，几乎所有设备可用）
+    }
+
+    /**
+     * 打开系统文件选择器（ACTION_OPEN_DOCUMENT，所有设备可用，勾选多选）。
+     */
+    fun launchFilePicker() {
         openDocumentLauncher.launch(arrayOf("image/*", "video/*"))
     }
 
@@ -532,10 +537,18 @@ fun PhotoXHomeScreen(
             Column(modifier = Modifier.padding(vertical = 16.dp)) {
                 ImportSourceItem(
                     icon = { Icon(Icons.Outlined.PhotoLibrary, contentDescription = null, tint = MaterialTheme.colorScheme.primary) },
-                    text = "从系统相册选择",
+                    text = "从系统相册选择（手势多选）",
                     onClick = {
                         showImportSheet = false
-                        launchGalleryPicker()
+                        launchSystemGallery()
+                    }
+                )
+                ImportSourceItem(
+                    icon = { Icon(Icons.Outlined.FolderOpen, contentDescription = null, tint = MaterialTheme.colorScheme.primary) },
+                    text = "从文件选择器选择（勾选多选）",
+                    onClick = {
+                        showImportSheet = false
+                        launchFilePicker()
                     }
                 )
                 ImportSourceItem(

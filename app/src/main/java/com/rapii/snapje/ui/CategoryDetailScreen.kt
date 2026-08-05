@@ -29,6 +29,7 @@ import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.CameraAlt
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Folder
+import androidx.compose.material.icons.filled.FolderOpen
 import androidx.compose.material.icons.filled.PhotoLibrary
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.SaveAlt
@@ -227,12 +228,10 @@ fun CategoryDetailScreen(
     }
 
     /**
-     * 调起系统相册选择（图片+视频，多选）。
-     * 优先用 ACTION_PICK（厂商相册，支持长按滑动手势多选）；
-     * 若设备不支持则回退到 ACTION_OPEN_DOCUMENT（通用文件选择器），避免闪退。
+     * 打开系统原生相册（ACTION_PICK，支持长按+滑动手势多选）。
+     * 若设备不支持会提示用户改用文件选择器，不会闪退。
      */
-    fun launchGalleryPicker() {
-        // 方案 1：ACTION_PICK 系统相册
+    fun launchSystemGallery() {
         val pickIntent = Intent(
             Intent.ACTION_PICK,
             MediaStore.Files.getContentUri(MediaStore.VOLUME_EXTERNAL)
@@ -242,9 +241,15 @@ fun CategoryDetailScreen(
         }
         if (pickIntent.resolveActivity(context.packageManager) != null) {
             galleryLauncher.launch(pickIntent)
-            return
+        } else {
+            Toast.makeText(context, "当前设备不支持系统相册，请改用文件选择器", Toast.LENGTH_LONG).show()
         }
-        // 方案 2：ACTION_OPEN_DOCUMENT（通用，几乎所有设备可用）
+    }
+
+    /**
+     * 打开系统文件选择器（ACTION_OPEN_DOCUMENT，所有设备可用，勾选多选）。
+     */
+    fun launchFilePicker() {
         openDocumentLauncher.launch(arrayOf("image/*", "video/*"))
     }
 
@@ -1423,15 +1428,29 @@ fun CategoryDetailScreen(
                         .fillMaxWidth()
                         .clickable {
                             showImportSheet = false
-                            // 调起系统相册（图片+视频多选；不支持时自动回退，不闪退）
-                            launchGalleryPicker()
+                            launchSystemGallery()
                         }
                         .padding(horizontal = 24.dp, vertical = 16.dp),
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     Icon(Icons.Default.PhotoLibrary, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
                     Spacer(modifier = Modifier.width(16.dp))
-                    Text("从系统相册选择", style = MaterialTheme.typography.bodyLarge)
+                    Text("从系统相册选择（手势多选）", style = MaterialTheme.typography.bodyLarge)
+                }
+                // 从文件选择器选择（勾选多选）
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clickable {
+                            showImportSheet = false
+                            launchFilePicker()
+                        }
+                        .padding(horizontal = 24.dp, vertical = 16.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Icon(Icons.Default.FolderOpen, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
+                    Spacer(modifier = Modifier.width(16.dp))
+                    Text("从文件选择器选择（勾选多选）", style = MaterialTheme.typography.bodyLarge)
                 }
                 // 拍照
                 Row(
