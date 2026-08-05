@@ -107,7 +107,7 @@ fun PhotoXHomeScreen(
 
     // 删除系统相册原图（Android 11+ 需要用户确认的系统对话框）
     val deleteOriginalLauncher = rememberLauncherForActivityResult(
-        contract = ActivityResultContracts.StartActivityForResult()
+        contract = ActivityResultContracts.StartIntentSenderForResult()
     ) { result ->
         pendingDeleteOriginalUri = null
         if (result.resultCode == Activity.RESULT_OK) {
@@ -126,8 +126,9 @@ fun PhotoXHomeScreen(
         val resolver = context.contentResolver
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
             try {
-                val intent = MediaStore.createDeleteRequest(resolver, listOf(uri))
-                deleteOriginalLauncher.launch(intent)
+                val pendingIntent = MediaStore.createDeleteRequest(resolver, listOf(uri))
+                val request = androidx.activity.result.IntentSenderRequest.Builder(pendingIntent).build()
+                deleteOriginalLauncher.launch(request)
             } catch (e: Exception) {
                 // 非 MediaStore URI（如临时文件）直接删
                 runCatching { resolver.delete(uri, null, null) }
