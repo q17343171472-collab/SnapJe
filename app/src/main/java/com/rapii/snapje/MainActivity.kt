@@ -27,11 +27,11 @@ import javax.inject.Inject
 /**
  * Main entry point for SnapJe! (private vault gallery).
  *
- * 生物识别门（覆盖式上锁）：
+ * PIN 密码门（覆盖式上锁）：
+ * - 首次使用先设置 4-6 位数字密码，之后启动 / 从后台返回需输入密码解锁。
  * - 导航树始终保持在组合中（这样 ActivityResult Launcher 的 key 不会丢失，
  *   系统相册选择 / 相机返回结果才能正常送达）。
- * - App 启动或退到后台（onStop 且非配置变更）时 [isUnlocked] 置 false，
- *   [AuthScreen] 作为全屏不透明层盖在最上层；指纹 / 面部验证通过后移除。
+ * - [AuthScreen] 作为全屏不透明层盖在最上层；密码验证通过后移除。
  * - FLAG_SECURE：禁止截图与最近任务预览，防止内容外泄。
  */
 @AndroidEntryPoint
@@ -39,11 +39,17 @@ class MainActivity : FragmentActivity() {
 
     private var contentLoaded by mutableStateOf(false)
 
-    /** 是否已通过生物识别解锁（false 时 AuthScreen 全屏覆盖） */
+    /** 是否已解锁（false 时 AuthScreen 全屏覆盖） */
     private var isUnlocked by mutableStateOf(false)
 
-    /** 用户是否启用了生物识别验证（设置里可关；关闭后不再上锁） */
-    private var biometricEnabled by mutableStateOf(true)
+    /** 是否已从本地读取到 PIN 状态（读取完成前不显示验证页，避免闪烁） */
+    private var authReady by mutableStateOf(false)
+
+    /** 是否已设置过 PIN 密码 */
+    private var hasPin by mutableStateOf(false)
+
+    /** 已设置的密码位数 */
+    private var pinLength by mutableStateOf(4)
 
     @Inject
     lateinit var settingsManager: SettingsManager
@@ -57,12 +63,11 @@ class MainActivity : FragmentActivity() {
 
         super.onCreate(savedInstanceState)
 
-        // 读取用户设置：若已关闭生物识别验证，则启动直接进入、不再上锁
+        // 读取 PIN 设置状态：是否已设置密码、密码位数
         lifecycleScope.launch {
-            biometricEnabled = settingsManager.isBiometricEnabled()
-            if (!biometricEnabled) {
-                isUnlocked = true
-            }
+            hasPin = settingsManager.hasPin()
+            pinLength = settingsManager.pinLength()
+            authReady = true
         }
 
         // CRITICAL: Enable hardware acceleration for smooth transitions
@@ -89,17 +94,23 @@ class MainActivity : FragmentActivity() {
                     GalleryNavGraph(navController = navController)
 
                     // 上锁时用全屏 AuthScreen 覆盖（盖在最上层）
-                    if (!isUnlocked && biometricEnabled) {
+                    if (!isUnlocked && authReady) {
                         AuthScreen(
-                            onUnlocked = { isUnlocked = true },
-                            onSkip = {
-                                // 用户选择跳过验证：记住选择，之后启动/回前台都不再验证
+                            isFirstTimeSetup = !hasPin,
+                            pinLength = pinLength,
+                            onPinSet = { newPin ->
+                                // 首次设置密码：保存并解锁
                                 lifecycleScope.launch {
-                                    settingsManager.setBiometricEnabled(false)
+                                    settingsManager.setPin(newPin)
+                                    pinLength = newPin.length
+                                    hasPin = true
                                 }
-                                biometricEnabled = false
                                 isUnlocked = true
                             },
+                            onVerifyPin = { entered ->
+                                settingsManager.verifyPin(entered)
+                            },
+                            onUnlocked = { isUnlocked = true },
                             onExit = { finish() }
                         )
                     }
@@ -110,9 +121,8 @@ class MainActivity : FragmentActivity() {
 
     override fun onStop() {
         super.onStop()
-        // App 退到后台即重新上锁（配置变更除外，避免旋转屏幕时重新验证）。
-        // 仅当用户启用了生物识别验证时才上锁；跳过后不再反复弹验证。
-        if (biometricEnabled && !isChangingConfigurations) {
+        // App 退到后台即重新上锁（配置变更除外，避免旋转屏幕时重新验证）
+        if (!isChangingConfigurations) {
             isUnlocked = false
             // 清理 Coil 磁盘缓存中的可能明文残留（保险库加载器本身已禁用磁盘缓存）
             runCatching { ImageLoaderFactory.clearAllDiskCaches(this) }

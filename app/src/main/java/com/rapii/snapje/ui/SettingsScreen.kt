@@ -4,6 +4,7 @@ import android.widget.Toast
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
@@ -14,6 +15,8 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.text.input.KeyboardType
+import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.ViewModel
@@ -42,6 +45,7 @@ fun SettingsScreen(
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
     val settingsState by viewModel.settingsFlow.collectAsState()
+    var showChangePinDialog by remember { mutableStateOf(false) }
 
     Scaffold(
         topBar = {
@@ -91,14 +95,19 @@ fun SettingsScreen(
 
             // Security Settings
             SettingsSection(title = "Security") {
-                BiometricSetting(
-                    isEnabled = settingsState.biometricEnabled,
-                    onEnabledChanged = {
+                ChangePinSetting(onClick = { showChangePinDialog = true })
+            }
+
+            if (showChangePinDialog) {
+                ChangePinDialog(
+                    onDismiss = { showChangePinDialog = false },
+                    onConfirm = { oldPin, newPin ->
                         scope.launch {
-                            viewModel.setBiometricEnabled(it)
+                            val ok = viewModel.changePin(oldPin, newPin)
+                            showChangePinDialog = false
                             Toast.makeText(
                                 context,
-                                if (it) "指纹/面部验证已开启" else "指纹/面部验证已关闭",
+                                if (ok) "密码修改成功" else "当前密码错误",
                                 Toast.LENGTH_SHORT
                             ).show()
                         }
@@ -192,23 +201,19 @@ fun SettingsSection(
 }
 
 /**
- * 指纹/面部验证开关。
- * 关闭后 App 启动不再要求验证（设备需先有可用生物识别才能开启）。
+ * 修改密码设置项。
  */
 @Composable
-fun BiometricSetting(
-    isEnabled: Boolean,
-    onEnabledChanged: (Boolean) -> Unit
-) {
+fun ChangePinSetting(onClick: () -> Unit) {
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .clickable { onEnabledChanged(!isEnabled) }
+            .clickable(onClick = onClick)
             .padding(horizontal = 16.dp, vertical = 12.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
         Icon(
-            imageVector = Icons.Default.Fingerprint,
+            imageVector = Icons.Default.Lock,
             contentDescription = null,
             modifier = Modifier.size(24.dp),
             tint = MaterialTheme.colorScheme.onSurfaceVariant
@@ -219,20 +224,91 @@ fun BiometricSetting(
                 .padding(start = 16.dp)
         ) {
             Text(
-                text = "指纹/面部验证",
+                text = "修改密码",
                 style = MaterialTheme.typography.bodyLarge
             )
             Text(
-                text = if (isEnabled) "已开启：启动时需要验证" else "已关闭：启动直接进入",
+                text = "修改启动时使用的 4-6 位数字密码",
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
         }
-        Switch(
-            checked = isEnabled,
-            onCheckedChange = onEnabledChanged
+        Icon(
+            imageVector = Icons.Default.ChevronRight,
+            contentDescription = null,
+            tint = MaterialTheme.colorScheme.onSurfaceVariant
         )
     }
+}
+
+/**
+ * 修改密码对话框：输入当前密码 + 新密码 + 确认新密码。
+ */
+@Composable
+fun ChangePinDialog(
+    onDismiss: () -> Unit,
+    onConfirm: (oldPin: String, newPin: String) -> Unit
+) {
+    var oldPin by remember { mutableStateOf("") }
+    var newPin by remember { mutableStateOf("") }
+    var confirmNewPin by remember { mutableStateOf("") }
+    var error by remember { mutableStateOf<String?>(null) }
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("修改密码") },
+        text = {
+            Column {
+                OutlinedTextField(
+                    value = oldPin,
+                    onValueChange = { oldPin = it.filter(Char::isDigit).take(6) },
+                    label = { Text("当前密码") },
+                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.NumberPassword),
+                    visualTransformation = PasswordVisualTransformation(),
+                    singleLine = true
+                )
+                Spacer(modifier = Modifier.height(8.dp))
+                OutlinedTextField(
+                    value = newPin,
+                    onValueChange = { newPin = it.filter(Char::isDigit).take(6) },
+                    label = { Text("新密码（4-6 位数字）") },
+                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.NumberPassword),
+                    visualTransformation = PasswordVisualTransformation(),
+                    singleLine = true
+                )
+                Spacer(modifier = Modifier.height(8.dp))
+                OutlinedTextField(
+                    value = confirmNewPin,
+                    onValueChange = { confirmNewPin = it.filter(Char::isDigit).take(6) },
+                    label = { Text("确认新密码") },
+                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.NumberPassword),
+                    visualTransformation = PasswordVisualTransformation(),
+                    singleLine = true
+                )
+                error?.let {
+                    Spacer(modifier = Modifier.height(8.dp))
+                    Text(
+                        text = it,
+                        color = MaterialTheme.colorScheme.error,
+                        style = MaterialTheme.typography.bodySmall
+                    )
+                }
+            }
+        },
+        confirmButton = {
+            TextButton(onClick = {
+                when {
+                    oldPin.isEmpty() -> error = "请输入当前密码"
+                    newPin.length < 4 || newPin.length > 6 -> error = "新密码需为 4-6 位数字"
+                    newPin != confirmNewPin -> error = "两次输入的新密码不一致"
+                    else -> onConfirm(oldPin, newPin)
+                }
+            }) { Text("确定") }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) { Text("取消") }
+        }
+    )
 }
 
 /**
@@ -511,8 +587,7 @@ data class SettingsState(
     val theme: String = "System",
     val defaultSort: String = "Date (Newest)",
     val reverseSort: Boolean = false,
-    val cacheSizeMB: Int = 100,
-    val biometricEnabled: Boolean = true
+    val cacheSizeMB: Int = 100
 )
 
 /**
@@ -552,8 +627,8 @@ class SettingsViewModel @Inject constructor(
         settingsManager.setCacheSizeMB(size)
     }
 
-    suspend fun setBiometricEnabled(enabled: Boolean) {
-        settingsManager.setBiometricEnabled(enabled)
+    suspend fun changePin(oldPin: String, newPin: String): Boolean {
+        return settingsManager.changePin(oldPin, newPin)
     }
 
     suspend fun clearCache() {

@@ -29,7 +29,9 @@ object SettingsKeys {
     val DEFAULT_SORT = stringPreferencesKey("default_sort")
     val REVERSE_SORT = booleanPreferencesKey("reverse_sort")
     val CACHE_SIZE_MB = intPreferencesKey("cache_size_mb")
-    val BIOMETRIC_ENABLED = booleanPreferencesKey("biometric_enabled")
+    val PIN_HASH = stringPreferencesKey("pin_hash")
+    val PIN_SALT = stringPreferencesKey("pin_salt")
+    val PIN_LENGTH = intPreferencesKey("pin_length")
 }
 
 /**
@@ -49,19 +51,72 @@ class SettingsManager @Inject constructor(
             theme = preferences[SettingsKeys.THEME] ?: "System",
             defaultSort = preferences[SettingsKeys.DEFAULT_SORT] ?: "Date (Newest)",
             reverseSort = preferences[SettingsKeys.REVERSE_SORT] ?: false,
-            cacheSizeMB = preferences[SettingsKeys.CACHE_SIZE_MB] ?: 100,
-            biometricEnabled = preferences[SettingsKeys.BIOMETRIC_ENABLED] ?: true
+            cacheSizeMB = preferences[SettingsKeys.CACHE_SIZE_MB] ?: 100
         )
     }
 
     /**
-     * 是否启用指纹/面部验证（用户可在设置中开关）。
-     * 默认开启；设备无生物识别时用户可选择跳过。
+     * 是否已设置过 PIN 密码。
      */
-    suspend fun isBiometricEnabled(): Boolean {
+    suspend fun hasPin(): Boolean {
         return context.dataStore.data.map { prefs ->
-            prefs[SettingsKeys.BIOMETRIC_ENABLED] ?: true
+            !prefs[SettingsKeys.PIN_HASH].isNullOrEmpty()
         }.first()
+    }
+
+    /**
+     * 设置 PIN 密码（加盐 SHA-256 哈希存储，不保存明文）。
+     */
+    suspend fun setPin(pin: String) {
+        val salt = generateSalt()
+        val hash = hashPin(pin, salt)
+        context.dataStore.edit { preferences ->
+            preferences[SettingsKeys.PIN_SALT] = salt
+            preferences[SettingsKeys.PIN_HASH] = hash
+            preferences[SettingsKeys.PIN_LENGTH] = pin.length
+        }
+    }
+
+    /**
+     * 已设置的密码位数（默认 4）。
+     */
+    suspend fun pinLength(): Int {
+        return context.dataStore.data.map { prefs ->
+            prefs[SettingsKeys.PIN_LENGTH] ?: 4
+        }.first()
+    }
+
+    /**
+     * 验证 PIN 密码是否正确。
+     */
+    suspend fun verifyPin(pin: String): Boolean {
+        return context.dataStore.data.map { prefs ->
+            val salt = prefs[SettingsKeys.PIN_SALT] ?: return@map false
+            val stored = prefs[SettingsKeys.PIN_HASH] ?: return@map false
+            stored == hashPin(pin, salt)
+        }.first()
+    }
+
+    /**
+     * 修改密码：旧密码正确才允许设置新密码。
+     * @return true=修改成功，false=旧密码错误
+     */
+    suspend fun changePin(oldPin: String, newPin: String): Boolean {
+        if (!verifyPin(oldPin)) return false
+        setPin(newPin)
+        return true
+    }
+
+    private fun generateSalt(): String {
+        val bytes = ByteArray(16)
+        java.security.SecureRandom().nextBytes(bytes)
+        return bytes.joinToString("") { "%02x".format(it) }
+    }
+
+    private fun hashPin(pin: String, salt: String): String {
+        val digest = java.security.MessageDigest.getInstance("SHA-256")
+        val bytes = digest.digest((salt + pin).toByteArray(Charsets.UTF_8))
+        return bytes.joinToString("") { "%02x".format(it) }
     }
 
     /**
@@ -110,15 +165,6 @@ class SettingsManager @Inject constructor(
     }
 
     /**
-     * 开启/关闭指纹/面部验证。
-     */
-    suspend fun setBiometricEnabled(enabled: Boolean) {
-        context.dataStore.edit { preferences ->
-            preferences[SettingsKeys.BIOMETRIC_ENABLED] = enabled
-        }
-    }
-
-    /**
      * Save complete settings state.
      */
     suspend fun saveSettings(state: SettingsState) {
@@ -128,7 +174,6 @@ class SettingsManager @Inject constructor(
             preferences[SettingsKeys.DEFAULT_SORT] = state.defaultSort
             preferences[SettingsKeys.REVERSE_SORT] = state.reverseSort
             preferences[SettingsKeys.CACHE_SIZE_MB] = state.cacheSizeMB
-            preferences[SettingsKeys.BIOMETRIC_ENABLED] = state.biometricEnabled
         }
     }
 
