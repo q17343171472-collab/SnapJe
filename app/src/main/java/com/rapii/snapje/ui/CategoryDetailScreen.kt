@@ -10,7 +10,6 @@ import android.provider.MediaStore
 import android.widget.Toast
 import androidx.activity.compose.LocalOnBackPressedDispatcherOwner
 import androidx.activity.compose.rememberLauncherForActivityResult
-import androidx.activity.result.PickVisualMediaRequest
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.core.animateIntAsState
 import androidx.compose.animation.core.tween
@@ -189,15 +188,27 @@ fun CategoryDetailScreen(
     // 删除原图相关（支持批量）
     var pendingDeleteOriginalUris by remember { mutableStateOf<List<Uri>>(emptyList()) }
 
-    // 选择照片/视频（支持多选图片和视频）
-    val photoPicker = rememberLauncherForActivityResult(
-        contract = ActivityResultContracts.PickMultipleVisualMedia()
-    ) { uris ->
-        if (uris.isNotEmpty()) {
-            pendingImportUris = uris
-            // 默认导入到当前分组
-            albumName = uiState.category?.displayName ?: "我的保险库"
-            showAlbumDialog = true
+    // 选择照片/视频（直接调起系统 Gallery，支持长按+滑动手势多选）
+    val galleryLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.StartActivityForResult()
+    ) { result ->
+        if (result.resultCode == Activity.RESULT_OK) {
+            val data = result.data ?: return@rememberLauncherForActivityResult
+            val uris = mutableListOf<Uri>()
+            // 多选：从 clipData 取
+            data.clipData?.let { clipData ->
+                for (i in 0 until clipData.itemCount) {
+                    uris.add(clipData.getItemAt(i).uri)
+                }
+            }
+            // 单选：从 data 取
+            data.data?.let { uris.add(it) }
+            if (uris.isNotEmpty()) {
+                pendingImportUris = uris
+                // 默认导入到当前分组
+                albumName = uiState.category?.displayName ?: "我的保险库"
+                showAlbumDialog = true
+            }
         }
     }
 
@@ -1325,24 +1336,24 @@ fun CategoryDetailScreen(
     if (showImportSheet) {
         ModalBottomSheet(onDismissRequest = { showImportSheet = false }) {
             Column(modifier = Modifier.padding(vertical = 16.dp)) {
-                // 从系统相册选择（支持图片和视频）
+                // 从系统相册选择（支持长按+滑动手势多选）
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
                         .clickable {
                             showImportSheet = false
-                            photoPicker.launch(
-                                PickVisualMediaRequest(
-                                    ActivityResultContracts.PickVisualMedia.ImageAndVideo
-                                )
-                            )
+                            // 调起系统 Gallery
+                            val intent = Intent(Intent.ACTION_PICK, MediaStore.Images.Media.EXTERNAL_CONTENT_URI).apply {
+                                putExtra(Intent.EXTRA_ALLOW_MULTIPLE, true)
+                            }
+                            galleryLauncher.launch(intent)
                         }
                         .padding(horizontal = 24.dp, vertical = 16.dp),
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     Icon(Icons.Default.PhotoLibrary, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
                     Spacer(modifier = Modifier.width(16.dp))
-                    Text("从系统相册选择（图片/视频）", style = MaterialTheme.typography.bodyLarge)
+                    Text("从系统相册选择", style = MaterialTheme.typography.bodyLarge)
                 }
                 // 拍照
                 Row(

@@ -8,7 +8,6 @@ import android.os.Build
 import android.provider.MediaStore
 import android.widget.Toast
 import androidx.activity.compose.rememberLauncherForActivityResult
-import androidx.activity.result.PickVisualMediaRequest
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Box
@@ -184,13 +183,25 @@ fun PhotoXHomeScreen(
         pendingDeleteOriginalUris = emptyList()
     }
 
-    // 系统相册选择（Photo Picker，支持多选图片/视频）
-    val photoPicker = rememberLauncherForActivityResult(
-        contract = ActivityResultContracts.PickMultipleVisualMedia()
-    ) { uris ->
-        if (uris.isNotEmpty()) {
-            pendingImportUris = uris
-            showAlbumDialog = true
+    // 系统相册选择（直接调起系统 Gallery，支持长按+滑动手势多选）
+    val galleryLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.StartActivityForResult()
+    ) { result ->
+        if (result.resultCode == Activity.RESULT_OK) {
+            val data = result.data ?: return@rememberLauncherForActivityResult
+            val uris = mutableListOf<Uri>()
+            // 多选：从 clipData 取
+            data.clipData?.let { clipData ->
+                for (i in 0 until clipData.itemCount) {
+                    uris.add(clipData.getItemAt(i).uri)
+                }
+            }
+            // 单选：从 data 取
+            data.data?.let { uris.add(it) }
+            if (uris.isNotEmpty()) {
+                pendingImportUris = uris
+                showAlbumDialog = true
+            }
         }
     }
 
@@ -482,14 +493,14 @@ fun PhotoXHomeScreen(
             Column(modifier = Modifier.padding(vertical = 16.dp)) {
                 ImportSourceItem(
                     icon = { Icon(Icons.Outlined.PhotoLibrary, contentDescription = null, tint = MaterialTheme.colorScheme.primary) },
-                    text = "从系统相册选择（可多选）",
+                    text = "从系统相册选择",
                     onClick = {
                         showImportSheet = false
-                        photoPicker.launch(
-                            PickVisualMediaRequest(
-                                ActivityResultContracts.PickVisualMedia.ImageAndVideo
-                            )
-                        )
+                        // 调起系统 Gallery（支持长按+滑动手势多选）
+                        val intent = Intent(Intent.ACTION_PICK, MediaStore.Images.Media.EXTERNAL_CONTENT_URI).apply {
+                            putExtra(Intent.EXTRA_ALLOW_MULTIPLE, true)
+                        }
+                        galleryLauncher.launch(intent)
                     }
                 )
                 ImportSourceItem(
