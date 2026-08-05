@@ -2,6 +2,7 @@ package com.rapii.snapje.ui.components
 
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.automirrored.filled.DriveFileMove
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.SaveAlt
@@ -68,6 +69,7 @@ fun CategoryDetailSelectionTopAppBar(
     onCancel: () -> Unit,
     onDelete: () -> Unit,
     onSave: (() -> Unit)? = null,
+    onMove: (() -> Unit)? = null,
     modifier: Modifier = Modifier
 ) {
     TopAppBar(
@@ -95,6 +97,23 @@ fun CategoryDetailSelectionTopAppBar(
                     Icon(
                         imageVector = Icons.Default.SaveAlt,
                         contentDescription = "保存到相册",
+                        tint = if (canDelete) {
+                            MaterialTheme.colorScheme.primary
+                        } else {
+                            MaterialTheme.colorScheme.onSurface.copy(alpha = 0.38f)
+                        }
+                    )
+                }
+            }
+            // 移动到其他分组（保险库照片）
+            if (onMove != null) {
+                IconButton(
+                    onClick = onMove,
+                    enabled = canDelete
+                ) {
+                    Icon(
+                        imageVector = Icons.AutoMirrored.Filled.DriveFileMove,
+                        contentDescription = "移动到其他分组",
                         tint = if (canDelete) {
                             MaterialTheme.colorScheme.primary
                         } else {

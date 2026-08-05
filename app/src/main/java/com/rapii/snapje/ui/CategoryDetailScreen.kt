@@ -28,6 +28,7 @@ import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.CameraAlt
 import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.Folder
 import androidx.compose.material.icons.filled.PhotoLibrary
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.SaveAlt
@@ -264,11 +265,17 @@ fun CategoryDetailScreen(
             return uri
         }
         val id = runCatching {
-            context.contentResolver.query(uri, arrayOf(MediaStore.Images.Media._ID), null, null, null)
-                ?.use { if (it.moveToFirst()) it.getLong(it.getColumnIndexOrThrow(MediaStore.Images.Media._ID)) else null }
+            context.contentResolver.query(uri, arrayOf(MediaStore.MediaColumns._ID), null, null, null)
+                ?.use { if (it.moveToFirst()) it.getLong(it.getColumnIndexOrThrow(MediaStore.MediaColumns._ID)) else null }
         }.getOrNull() ?: uri.lastPathSegment?.toLongOrNull()
         return if (id != null) {
-            ContentUris.withAppendedId(MediaStore.Images.Media.EXTERNAL_CONTENT_URI, id)
+            // 按 MIME 区分图片/视频集合（视频 URI 用 Video 表，否则删除会失败）
+            val mime = runCatching { context.contentResolver.getType(uri) }.getOrNull() ?: ""
+            if (mime.startsWith("video/")) {
+                ContentUris.withAppendedId(MediaStore.Video.Media.EXTERNAL_CONTENT_URI, id)
+            } else {
+                ContentUris.withAppendedId(MediaStore.Images.Media.EXTERNAL_CONTENT_URI, id)
+            }
         } else {
             uri
         }
@@ -613,6 +620,42 @@ fun CategoryDetailScreen(
             ).show()
             isSelectionMode = false
             selectedPhotos = emptySet()
+        }
+    }
+
+    // ---- 移动到其他分组 ----
+    var showMoveGroupDialog by remember { mutableStateOf(false) }
+    var moveTargetBuckets by remember { mutableStateOf<List<com.rapii.snapje.data.local.VaultBucket>>(emptyList()) }
+
+    // 打开"移动到分组"弹窗：加载除当前分组外的所有分组
+    fun openMoveDialog() {
+        val photos = selectedPhotos.toList()
+        if (photos.isEmpty()) return
+        scope.launch {
+            val currentBucketId = uiState.category?.id
+            val buckets = viewModel.getVaultBuckets()
+                .filter { it.bucketId != currentBucketId }
+            moveTargetBuckets = buckets
+            showMoveGroupDialog = true
+        }
+    }
+
+    // 执行移动到目标分组
+    fun handleMoveToBucket(targetBucketId: Long, targetBucketName: String) {
+        val photos = selectedPhotos.toList()
+        if (photos.isEmpty()) return
+        showMoveGroupDialog = false
+        scope.launch {
+            val count = viewModel.moveVaultPhotos(photos, targetBucketId, targetBucketName)
+            if (count > 0) {
+                Toast.makeText(context, "已移动 $count 项到「$targetBucketName」", Toast.LENGTH_SHORT).show()
+                // 刷新当前分组列表（移走的照片会从当前分组消失）
+                viewModel.loadPhotos()
+                isSelectionMode = false
+                selectedPhotos = emptySet()
+            } else {
+                Toast.makeText(context, "移动失败", Toast.LENGTH_LONG).show()
+            }
         }
     }
 
@@ -1042,6 +1085,9 @@ fun CategoryDetailScreen(
                     onDelete = { handleBatchDelete() },
                     onSave = {
                         if (selectedPhotos.isNotEmpty()) handleBatchExport()
+                    },
+                    onMove = {
+                        if (selectedPhotos.isNotEmpty()) openMoveDialog()
                     }
                 )
             } else {
@@ -1342,8 +1388,12 @@ fun CategoryDetailScreen(
                         .fillMaxWidth()
                         .clickable {
                             showImportSheet = false
-                            // 调起系统 Gallery
-                            val intent = Intent(Intent.ACTION_PICK, MediaStore.Images.Media.EXTERNAL_CONTENT_URI).apply {
+                            // 调起系统 Gallery（图片+视频，支持长按+滑动手势多选）
+                            val intent = Intent(
+                                Intent.ACTION_PICK,
+                                MediaStore.Files.getContentUri(MediaStore.VOLUME_EXTERNAL)
+                            ).apply {
+                                putExtra(Intent.EXTRA_MIME_TYPES, arrayOf("image/*", "video/*"))
                                 putExtra(Intent.EXTRA_ALLOW_MULTIPLE, true)
                             }
                             galleryLauncher.launch(intent)
@@ -1438,6 +1488,55 @@ fun CategoryDetailScreen(
                     Toast.makeText(context, R.string.original_kept, Toast.LENGTH_SHORT).show()
                 }) {
                     Text(stringResource(R.string.delete_original_keep))
+                }
+            }
+        )
+    }
+
+    // ---- 移动到其他分组：选择目标分组 ----
+    if (showMoveGroupDialog) {
+        AlertDialog(
+            onDismissRequest = { showMoveGroupDialog = false },
+            title = { Text("移动到其他分组") },
+            text = {
+                if (moveTargetBuckets.isEmpty()) {
+                    Text(
+                        "没有其他分组可用。\n请先在首页创建其他相册分组。",
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                } else {
+                    Column {
+                        moveTargetBuckets.forEach { bucket ->
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .clickable {
+                                        handleMoveToBucket(bucket.bucketId, bucket.bucketName)
+                                    }
+                                    .padding(vertical = 12.dp, horizontal = 4.dp),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Default.Folder,
+                                    contentDescription = null,
+                                    tint = MaterialTheme.colorScheme.primary
+                                )
+                                Spacer(modifier = Modifier.width(12.dp))
+                                Text(
+                                    text = bucket.bucketName.ifBlank { "我的保险库" },
+                                    style = MaterialTheme.typography.bodyLarge
+                                )
+                            }
+                            HorizontalDivider()
+                        }
+                    }
+                }
+            },
+            confirmButton = {},
+            dismissButton = {
+                TextButton(onClick = { showMoveGroupDialog = false }) {
+                    Text(stringResource(R.string.cancel))
                 }
             }
         )

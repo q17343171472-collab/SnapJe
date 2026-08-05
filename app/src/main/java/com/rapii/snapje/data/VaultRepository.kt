@@ -7,6 +7,7 @@ import android.graphics.BitmapFactory
 import android.net.Uri
 import android.provider.MediaStore
 import com.rapii.snapje.data.encryption.EncryptionManager
+import com.rapii.snapje.data.local.VaultBucket
 import com.rapii.snapje.data.local.VaultPhotoDao
 import com.rapii.snapje.util.L
 import dagger.hilt.android.qualifiers.ApplicationContext
@@ -95,6 +96,32 @@ class VaultRepository @Inject constructor(
     suspend fun getAlbumNames(): List<String> = withContext(Dispatchers.IO) {
         vaultPhotoDao.getBuckets().map { it.bucketName }.distinct()
     }
+
+    /**
+     * 获取所有分组（bucketId -> bucketName），供"移动到其他分组"选择用。
+     */
+    suspend fun getBuckets(): List<VaultBucket> = withContext(Dispatchers.IO) {
+        vaultPhotoDao.getBuckets()
+    }
+
+    /**
+     * 批量把照片移动到另一个分组。
+     * 只更新元数据（bucketId/bucketName），加密文件不动。
+     *
+     * @return 成功移动的数量
+     */
+    suspend fun movePhotosToBucket(ids: List<String>, newBucketId: Long, newBucketName: String): Int =
+        withContext(Dispatchers.IO) {
+            if (ids.isEmpty()) return@withContext 0
+            val effectiveName = newBucketName.ifBlank { DEFAULT_ALBUM }
+            runCatching {
+                vaultPhotoDao.movePhotos(ids, newBucketId, effectiveName)
+                ids.size
+            }.getOrElse {
+                L.e("VaultRepository", "movePhotosToBucket failed: ${it.message}")
+                0
+            }
+        }
 
     // ---------------------------------------------------------------------
     // 导入（加密存储）

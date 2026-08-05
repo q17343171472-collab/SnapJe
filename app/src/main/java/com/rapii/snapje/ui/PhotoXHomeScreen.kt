@@ -132,21 +132,26 @@ fun PhotoXHomeScreen(
         ) {
             return uri
         }
-        // 尝试查询 _ID 并拼出标准 media 地址
+        // 尝试查询 _ID 并拼出标准 media 地址（按 MIME 区分图片/视频集合）
         val id = runCatching {
             context.contentResolver.query(
                 uri,
-                arrayOf(MediaStore.Images.Media._ID),
+                arrayOf(MediaStore.MediaColumns._ID),
                 null, null, null
             )?.use { cursor ->
                 if (cursor.moveToFirst()) {
-                    val idx = cursor.getColumnIndexOrThrow(MediaStore.Images.Media._ID)
+                    val idx = cursor.getColumnIndexOrThrow(MediaStore.MediaColumns._ID)
                     cursor.getLong(idx)
                 } else null
             }
         }.getOrNull() ?: uri.lastPathSegment?.toLongOrNull()
         return if (id != null) {
-            ContentUris.withAppendedId(MediaStore.Images.Media.EXTERNAL_CONTENT_URI, id)
+            val mime = runCatching { context.contentResolver.getType(uri) }.getOrNull() ?: ""
+            if (mime.startsWith("video/")) {
+                ContentUris.withAppendedId(MediaStore.Video.Media.EXTERNAL_CONTENT_URI, id)
+            } else {
+                ContentUris.withAppendedId(MediaStore.Images.Media.EXTERNAL_CONTENT_URI, id)
+            }
         } else {
             uri
         }
@@ -496,8 +501,12 @@ fun PhotoXHomeScreen(
                     text = "从系统相册选择",
                     onClick = {
                         showImportSheet = false
-                        // 调起系统 Gallery（支持长按+滑动手势多选）
-                        val intent = Intent(Intent.ACTION_PICK, MediaStore.Images.Media.EXTERNAL_CONTENT_URI).apply {
+                        // 调起系统 Gallery（图片+视频，支持长按+滑动手势多选）
+                        val intent = Intent(
+                            Intent.ACTION_PICK,
+                            MediaStore.Files.getContentUri(MediaStore.VOLUME_EXTERNAL)
+                        ).apply {
+                            putExtra(Intent.EXTRA_MIME_TYPES, arrayOf("image/*", "video/*"))
                             putExtra(Intent.EXTRA_ALLOW_MULTIPLE, true)
                         }
                         galleryLauncher.launch(intent)

@@ -227,6 +227,22 @@ class CategoryDetailViewModel @Inject constructor(
     }
 
     /**
+     * 获取所有分组（供"移动到其他分组"选择）。
+     */
+    suspend fun getVaultBuckets(): List<com.rapii.snapje.data.local.VaultBucket> {
+        return vaultRepository.getBuckets()
+    }
+
+    /**
+     * 批量把选中的保险库照片移动到另一个分组，返回成功数量。
+     */
+    suspend fun moveVaultPhotos(photos: List<PhotoItem>, targetBucketId: Long, targetBucketName: String): Int {
+        val ids = photos.mapNotNull { it.vaultId }
+        if (ids.isEmpty()) return 0
+        return vaultRepository.movePhotosToBucket(ids, targetBucketId, targetBucketName)
+    }
+
+    /**
      * 解密保险库视频并返回 URI（供系统播放器播放）。
      */
     suspend fun videoUri(photo: PhotoItem): Uri? {

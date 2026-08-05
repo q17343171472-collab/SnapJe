@@ -79,4 +79,10 @@ interface VaultPhotoDao {
      */
     @Query("UPDATE vault_photos SET originalName = :newName WHERE id = :id")
     suspend fun renamePhoto(id: String, newName: String)
+
+    /**
+     * 批量移动照片到另一个分组（更新 bucketId / bucketName，加密文件不动）。
+     */
+    @Query("UPDATE vault_photos SET bucketId = :newBucketId, bucketName = :newBucketName WHERE id IN (:ids)")
+    suspend fun movePhotos(ids: List<String>, newBucketId: Long, newBucketName: String)
 }
