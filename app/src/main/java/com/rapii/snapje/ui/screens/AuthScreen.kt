@@ -15,6 +15,7 @@ import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material3.Button
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -34,6 +35,8 @@ import androidx.fragment.app.FragmentActivity
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.compose.currentStateAsState
+import android.content.Intent
+import android.provider.Settings
 import com.rapii.snapje.R
 import com.rapii.snapje.util.BiometricAuthManager
 import com.rapii.snapje.util.L
@@ -47,6 +50,7 @@ import kotlinx.coroutines.delay
 @Composable
 fun AuthScreen(
     onUnlocked: () -> Unit,
+    onSkip: () -> Unit = {},
     onExit: () -> Unit
 ) {
     val context = LocalContext.current
@@ -188,14 +192,27 @@ fun AuthScreen(
                 }
             } else {
                 Text(
-                    text = stringResource(R.string.biometric_unavailable),
+                    text = "设备未设置指纹或面部解锁\n无法验证，请先到手机系统设置中录入指纹/面部，\n或选择跳过验证直接进入",
                     style = MaterialTheme.typography.bodyLarge,
                     color = MaterialTheme.colorScheme.error,
                     textAlign = TextAlign.Center
                 )
                 Spacer(modifier = Modifier.height(24.dp))
-                Button(onClick = onExit) {
-                    Text(stringResource(R.string.exit_app))
+                Button(onClick = {
+                    // 打开系统安全设置，引导用户录入指纹/面部
+                    runCatching {
+                        context.startActivity(Intent(Settings.ACTION_BIOMETRIC_ENROLL))
+                    }.onFailure {
+                        runCatching {
+                            context.startActivity(Intent(Settings.ACTION_SECURITY_SETTINGS))
+                        }
+                    }
+                }) {
+                    Text("去设置指纹/面部")
+                }
+                Spacer(modifier = Modifier.height(8.dp))
+                OutlinedButton(onClick = onSkip) {
+                    Text("跳过验证，直接进入")
                 }
             }
 

@@ -89,6 +89,23 @@ fun SettingsScreen(
                 )
             }
 
+            // Security Settings
+            SettingsSection(title = "Security") {
+                BiometricSetting(
+                    isEnabled = settingsState.biometricEnabled,
+                    onEnabledChanged = {
+                        scope.launch {
+                            viewModel.setBiometricEnabled(it)
+                            Toast.makeText(
+                                context,
+                                if (it) "指纹/面部验证已开启" else "指纹/面部验证已关闭",
+                                Toast.LENGTH_SHORT
+                            ).show()
+                        }
+                    }
+                )
+            }
+
             // Sorting Settings
             SettingsSection(title = "Sorting") {
                 DefaultSortSetting(
@@ -171,6 +188,50 @@ fun SettingsSection(
             modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)
         )
         content()
+    }
+}
+
+/**
+ * 指纹/面部验证开关。
+ * 关闭后 App 启动不再要求验证（设备需先有可用生物识别才能开启）。
+ */
+@Composable
+fun BiometricSetting(
+    isEnabled: Boolean,
+    onEnabledChanged: (Boolean) -> Unit
+) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable { onEnabledChanged(!isEnabled) }
+            .padding(horizontal = 16.dp, vertical = 12.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Icon(
+            imageVector = Icons.Default.Fingerprint,
+            contentDescription = null,
+            modifier = Modifier.size(24.dp),
+            tint = MaterialTheme.colorScheme.onSurfaceVariant
+        )
+        Column(
+            modifier = Modifier
+                .weight(1f)
+                .padding(start = 16.dp)
+        ) {
+            Text(
+                text = "指纹/面部验证",
+                style = MaterialTheme.typography.bodyLarge
+            )
+            Text(
+                text = if (isEnabled) "已开启：启动时需要验证" else "已关闭：启动直接进入",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+        }
+        Switch(
+            checked = isEnabled,
+            onCheckedChange = onEnabledChanged
+        )
     }
 }
 
@@ -450,7 +511,8 @@ data class SettingsState(
     val theme: String = "System",
     val defaultSort: String = "Date (Newest)",
     val reverseSort: Boolean = false,
-    val cacheSizeMB: Int = 100
+    val cacheSizeMB: Int = 100,
+    val biometricEnabled: Boolean = true
 )
 
 /**
@@ -488,6 +550,10 @@ class SettingsViewModel @Inject constructor(
 
     suspend fun setCacheSizeMB(size: Int) {
         settingsManager.setCacheSizeMB(size)
+    }
+
+    suspend fun setBiometricEnabled(enabled: Boolean) {
+        settingsManager.setBiometricEnabled(enabled)
     }
 
     suspend fun clearCache() {

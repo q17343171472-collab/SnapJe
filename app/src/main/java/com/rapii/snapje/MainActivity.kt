@@ -13,12 +13,15 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.core.splashscreen.SplashScreen.Companion.installSplashScreen
 import androidx.fragment.app.FragmentActivity
+import androidx.lifecycle.lifecycleScope
 import androidx.navigation.compose.rememberNavController
+import com.rapii.snapje.data.SettingsManager
 import com.rapii.snapje.navigation.GalleryNavGraph
 import com.rapii.snapje.ui.screens.AuthScreen
 import com.rapii.snapje.ui.theme.GalleryXTheme
 import com.rapii.snapje.util.ImageLoaderFactory
 import dagger.hilt.android.AndroidEntryPoint
+import kotlinx.coroutines.launch
 import javax.inject.Inject
 
 /**
@@ -39,6 +42,9 @@ class MainActivity : FragmentActivity() {
     /** 是否已通过生物识别解锁（false 时 AuthScreen 全屏覆盖） */
     private var isUnlocked by mutableStateOf(false)
 
+    @Inject
+    lateinit var settingsManager: SettingsManager
+
     override fun onCreate(savedInstanceState: Bundle?) {
         // Install splash screen and keep it visible until content is loaded
         val splashScreen = installSplashScreen()
@@ -47,6 +53,13 @@ class MainActivity : FragmentActivity() {
         splashScreen.setKeepOnScreenCondition { !contentLoaded }
 
         super.onCreate(savedInstanceState)
+
+        // 用户已在设置中关闭生物识别验证：启动直接进入，不显示验证页
+        lifecycleScope.launch {
+            if (!settingsManager.isBiometricEnabled()) {
+                isUnlocked = true
+            }
+        }
 
         // CRITICAL: Enable hardware acceleration for smooth transitions
         window.setFlags(
@@ -75,6 +88,13 @@ class MainActivity : FragmentActivity() {
                     if (!isUnlocked) {
                         AuthScreen(
                             onUnlocked = { isUnlocked = true },
+                            onSkip = {
+                                // 设备无生物识别且用户选择跳过：记住选择，之后启动不再验证
+                                lifecycleScope.launch {
+                                    settingsManager.setBiometricEnabled(false)
+                                }
+                                isUnlocked = true
+                            },
                             onExit = { finish() }
                         )
                     }

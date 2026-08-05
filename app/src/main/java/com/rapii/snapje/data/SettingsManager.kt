@@ -10,6 +10,7 @@ import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.datastore.preferences.preferencesDataStore
 import com.rapii.snapje.ui.SettingsState
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
 import javax.inject.Inject
 import javax.inject.Singleton
@@ -28,6 +29,7 @@ object SettingsKeys {
     val DEFAULT_SORT = stringPreferencesKey("default_sort")
     val REVERSE_SORT = booleanPreferencesKey("reverse_sort")
     val CACHE_SIZE_MB = intPreferencesKey("cache_size_mb")
+    val BIOMETRIC_ENABLED = booleanPreferencesKey("biometric_enabled")
 }
 
 /**
@@ -47,8 +49,19 @@ class SettingsManager @Inject constructor(
             theme = preferences[SettingsKeys.THEME] ?: "System",
             defaultSort = preferences[SettingsKeys.DEFAULT_SORT] ?: "Date (Newest)",
             reverseSort = preferences[SettingsKeys.REVERSE_SORT] ?: false,
-            cacheSizeMB = preferences[SettingsKeys.CACHE_SIZE_MB] ?: 100
+            cacheSizeMB = preferences[SettingsKeys.CACHE_SIZE_MB] ?: 100,
+            biometricEnabled = preferences[SettingsKeys.BIOMETRIC_ENABLED] ?: true
         )
+    }
+
+    /**
+     * 是否启用指纹/面部验证（用户可在设置中开关）。
+     * 默认开启；设备无生物识别时用户可选择跳过。
+     */
+    suspend fun isBiometricEnabled(): Boolean {
+        return context.dataStore.data.map { prefs ->
+            prefs[SettingsKeys.BIOMETRIC_ENABLED] ?: true
+        }.first()
     }
 
     /**
@@ -97,6 +110,15 @@ class SettingsManager @Inject constructor(
     }
 
     /**
+     * 开启/关闭指纹/面部验证。
+     */
+    suspend fun setBiometricEnabled(enabled: Boolean) {
+        context.dataStore.edit { preferences ->
+            preferences[SettingsKeys.BIOMETRIC_ENABLED] = enabled
+        }
+    }
+
+    /**
      * Save complete settings state.
      */
     suspend fun saveSettings(state: SettingsState) {
@@ -106,6 +128,7 @@ class SettingsManager @Inject constructor(
             preferences[SettingsKeys.DEFAULT_SORT] = state.defaultSort
             preferences[SettingsKeys.REVERSE_SORT] = state.reverseSort
             preferences[SettingsKeys.CACHE_SIZE_MB] = state.cacheSizeMB
+            preferences[SettingsKeys.BIOMETRIC_ENABLED] = state.biometricEnabled
         }
     }
 
