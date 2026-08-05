@@ -8,6 +8,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.rapii.snapje.data.Category
 import com.rapii.snapje.data.Result
+import com.rapii.snapje.data.SettingsManager
 import com.rapii.snapje.data.SortBy
 import com.rapii.snapje.data.VaultPhoto
 import com.rapii.snapje.data.VaultRepository
@@ -29,7 +30,8 @@ import javax.inject.Inject
  */
 @HiltViewModel
 class CategoryViewModel @Inject constructor(
-    private val vaultRepository: VaultRepository
+    private val vaultRepository: VaultRepository,
+    private val settingsManager: SettingsManager
 ) : ViewModel() {
 
     // UI state
@@ -46,6 +48,9 @@ class CategoryViewModel @Inject constructor(
 
     // Cached categories - shared across app for faster navigation
     private var cachedCategories: List<Category> = emptyList()
+
+    // 是否已保存手动排序（拖拽排序后为 true；默认视图尊重手动顺序）
+    private var hasCustomOrder = false
 
     init {
         observeVault()
@@ -65,10 +70,11 @@ class CategoryViewModel @Inject constructor(
 
     /**
      * 从保险库照片构建分组（按 bucketId 聚合，封面取前 4 张解密缩略图）。
+     * 若用户手动排序过分组（持久化），则按该顺序排列。
      */
     private suspend fun buildCategories(photos: List<VaultPhoto>) {
         val grouped = photos.groupBy { it.bucketId }
-        val categories = grouped.map { (bucketId, list) ->
+        var categories = grouped.map { (bucketId, list) ->
             val bucketName = list.first().bucketName.ifBlank { VaultRepository.DEFAULT_ALBUM }
             val covers = mutableListOf<Uri>()
             for (photo in list.take(4)) {
@@ -83,7 +89,33 @@ class CategoryViewModel @Inject constructor(
                 lastModified = list.maxOf { it.dateTaken }
             )
         }
+
+        // 应用持久化的手动排序（仅对新出现/已存在的分组生效）
+        val savedOrder = settingsManager.getCategoryOrder()
+        hasCustomOrder = !savedOrder.isNullOrEmpty()
+        if (!savedOrder.isNullOrEmpty()) {
+            val orderIndex = savedOrder.withIndex().associate { it.value to it.index }
+            categories = categories.sortedBy { orderIndex[it.id] ?: Int.MAX_VALUE }
+        }
+
         cachedCategories = categories
+        applyFilters()
+    }
+
+    /**
+     * 更新分组顺序（长按拖拽后调用），并永久保存。
+     */
+    fun reorderCategories(orderedIds: List<Long>) {
+        val idToCategory = cachedCategories.associateBy { it.id }
+        val reordered = orderedIds.mapNotNull { idToCategory[it] }
+        // 补充未在列表中的分组（防御性）
+        val known = orderedIds.toSet()
+        val rest = cachedCategories.filter { it.id !in known }
+        cachedCategories = reordered + rest
+        hasCustomOrder = true
+        viewModelScope.launch {
+            settingsManager.saveCategoryOrder(cachedCategories.map { it.id })
+        }
         applyFilters()
     }
 
@@ -168,7 +200,12 @@ class CategoryViewModel @Inject constructor(
 
         val visibleCategories = filtered.filter { !it.isHidden }
 
-        val sortedCategories = Category.sortCategories(visibleCategories, sortBy)
+        // 默认视图（RECENT）尊重手动拖拽顺序；用户显式选择其他排序时才覆盖
+        val sortedCategories = if (sortBy == SortBy.RECENT && hasCustomOrder) {
+            visibleCategories
+        } else {
+            Category.sortCategories(visibleCategories, sortBy)
+        }
 
         _uiState.update {
             it.copy(

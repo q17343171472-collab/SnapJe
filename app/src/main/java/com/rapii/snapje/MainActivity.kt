@@ -51,8 +51,8 @@ class MainActivity : FragmentActivity() {
     /** 已设置的密码位数 */
     private var pinLength by mutableStateOf(4)
 
-    /** 是否启用启动密码验证（设置中可关闭） */
-    private var pinEnabled by mutableStateOf(true)
+    /** 是否启用启动密码验证（默认关闭；设置中可开启） */
+    private var pinEnabled by mutableStateOf(false)
 
     @Inject
     lateinit var settingsManager: SettingsManager

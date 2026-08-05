@@ -183,7 +183,6 @@ fun CategoryDetailScreen(
     var showImportSheet by remember { mutableStateOf(false) }
     var pendingImportUris by remember { mutableStateOf<List<Uri>>(emptyList()) }
     var pendingCameraUri by remember { mutableStateOf<Uri?>(null) }
-    var showAlbumDialog by remember { mutableStateOf(false) }
     var albumName by remember { mutableStateOf("") }
     var isImporting by remember { mutableStateOf(false) }
 
@@ -207,9 +206,9 @@ fun CategoryDetailScreen(
             data.data?.let { uris.add(it) }
             if (uris.isNotEmpty()) {
                 pendingImportUris = uris
-                // 默认导入到当前分组
+                // 分组内导入：直接导入当前分组，不再弹确认框
                 albumName = uiState.category?.displayName ?: "我的保险库"
-                showAlbumDialog = true
+                performImportBatch(uris, albumName)
             }
         }
     }
@@ -222,21 +221,22 @@ fun CategoryDetailScreen(
     ) { uris ->
         if (uris.isNotEmpty()) {
             pendingImportUris = uris
+            // 分组内导入：直接导入当前分组，不再弹确认框
             albumName = uiState.category?.displayName ?: "我的保险库"
-            showAlbumDialog = true
+            performImportBatch(uris, albumName)
         }
     }
 
     /**
-     * 打开系统原生相册（ACTION_PICK，支持长按+滑动手势多选）。
-     * 若设备不支持会提示用户改用文件选择器，不会闪退。
+     * 打开系统原生相册（ACTION_PICK + Images 表，绝大多数设备支持；仅图片，不含视频）。
      */
     fun launchSystemGallery() {
+        // 用 Images 表：之前验证可正常启动，只是不含视频；
+        // 若仍找不到处理者则回退到文件选择器，不闪退。
         val pickIntent = Intent(
             Intent.ACTION_PICK,
-            MediaStore.Files.getContentUri(MediaStore.VOLUME_EXTERNAL)
+            MediaStore.Images.Media.EXTERNAL_CONTENT_URI
         ).apply {
-            putExtra(Intent.EXTRA_MIME_TYPES, arrayOf("image/*", "video/*"))
             putExtra(Intent.EXTRA_ALLOW_MULTIPLE, true)
         }
         if (pickIntent.resolveActivity(context.packageManager) != null) {
@@ -261,9 +261,9 @@ fun CategoryDetailScreen(
         val uri = cameraLauncher.getLastPhotoUri()
         if (result.resultCode == Activity.RESULT_OK && uri != null) {
             pendingCameraUri = uri
-            // 默认导入到当前分组
+            // 分组内拍照：直接导入当前分组，不再弹确认框
             albumName = uiState.category?.displayName ?: "我的保险库"
-            showAlbumDialog = true
+            performImportBatch(listOf(uri), albumName)
         } else {
             cameraLauncher.clearPhotoUri()
         }
@@ -353,7 +353,6 @@ fun CategoryDetailScreen(
     fun clearPendingImport() {
         pendingImportUris = emptyList()
         cleanupCameraFile()
-        showAlbumDialog = false
         showImportSheet = false
     }
 
@@ -395,7 +394,6 @@ fun CategoryDetailScreen(
                 ).show()
             }
             cleanupCameraFile()
-            showAlbumDialog = false
         }
     }
 
@@ -1469,53 +1467,6 @@ fun CategoryDetailScreen(
                 }
             }
         }
-    }
-
-    // ---- 导入：确认相册名（默认当前分组，可修改） ----
-    if (showAlbumDialog) {
-        AlertDialog(
-            onDismissRequest = { clearPendingImport() },
-            title = { Text(stringResource(R.string.add_photo)) },
-            text = {
-                Column {
-                    OutlinedTextField(
-                        value = albumName,
-                        onValueChange = { albumName = it },
-                        label = { Text(stringResource(R.string.vault_album_hint)) },
-                        singleLine = true,
-                        modifier = Modifier.fillMaxWidth()
-                    )
-                    Spacer(modifier = Modifier.height(8.dp))
-                    Text(
-                        text = "当前分组：${uiState.category?.displayName ?: "相册"}（默认导入到本组）",
-                        style = MaterialTheme.typography.labelSmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                }
-            },
-            confirmButton = {
-                TextButton(
-                    onClick = {
-                        // 相册多选 或 相机单张
-                        val uris = if (pendingImportUris.isNotEmpty()) {
-                            pendingImportUris
-                        } else {
-                            pendingCameraUri?.let { listOf(it) } ?: emptyList()
-                        }
-                        if (uris.isNotEmpty()) {
-                            performImportBatch(uris, albumName.ifBlank { uiState.category?.displayName ?: "我的保险库" })
-                        }
-                    }
-                ) {
-                    Text(stringResource(R.string.import_success_confirm))
-                }
-            },
-            dismissButton = {
-                TextButton(onClick = { clearPendingImport() }) {
-                    Text(stringResource(R.string.cancel))
-                }
-            }
-        )
     }
 
     // ---- 导入后：询问是否删除相册原图（批量） ----

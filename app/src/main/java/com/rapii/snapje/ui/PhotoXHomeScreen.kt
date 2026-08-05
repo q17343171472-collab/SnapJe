@@ -224,15 +224,15 @@ fun PhotoXHomeScreen(
     }
 
     /**
-     * 打开系统原生相册（ACTION_PICK，支持长按+滑动手势多选）。
-     * 若设备不支持会提示用户改用文件选择器，不会闪退。
+     * 打开系统原生相册（ACTION_PICK + Images 表，绝大多数设备支持；仅图片，不含视频）。
      */
     fun launchSystemGallery() {
+        // 用 Images 表：之前验证可正常启动，只是不含视频；
+        // 若仍找不到处理者则提示改用文件选择器，不闪退。
         val pickIntent = Intent(
             Intent.ACTION_PICK,
-            MediaStore.Files.getContentUri(MediaStore.VOLUME_EXTERNAL)
+            MediaStore.Images.Media.EXTERNAL_CONTENT_URI
         ).apply {
-            putExtra(Intent.EXTRA_MIME_TYPES, arrayOf("image/*", "video/*"))
             putExtra(Intent.EXTRA_ALLOW_MULTIPLE, true)
         }
         if (pickIntent.resolveActivity(context.packageManager) != null) {
@@ -522,6 +522,9 @@ fun PhotoXHomeScreen(
                         },
                         onHideCategory = { categoryId: Long ->
                             viewModel.hideCategory(categoryId)
+                        },
+                        onReorder = { orderedIds ->
+                            viewModel.reorderCategories(orderedIds)
                         },
                         modifier = Modifier.fillMaxSize(),
                         columns = 2

@@ -46,6 +46,7 @@ fun SettingsScreen(
     val scope = rememberCoroutineScope()
     val settingsState by viewModel.settingsFlow.collectAsState()
     var showChangePinDialog by remember { mutableStateOf(false) }
+    var showSetupPinDialog by remember { mutableStateOf(false) }
 
     Scaffold(
         topBar = {
@@ -97,14 +98,20 @@ fun SettingsScreen(
             SettingsSection(title = "安全") {
                 PinLockSetting(
                     isEnabled = settingsState.pinEnabled,
-                    onEnabledChanged = {
+                    onEnabledChanged = { enable ->
                         scope.launch {
-                            viewModel.setPinEnabled(it)
-                            Toast.makeText(
-                                context,
-                                if (it) "启动密码验证已开启（下次启动生效）" else "启动密码验证已关闭（下次启动生效）",
-                                Toast.LENGTH_SHORT
-                            ).show()
+                            if (enable) {
+                                // 开启密码：若还没设置过密码，弹设置新密码对话框
+                                if (!viewModel.hasPin()) {
+                                    showSetupPinDialog = true
+                                } else {
+                                    viewModel.setPinEnabled(true)
+                                    Toast.makeText(context, "启动密码验证已开启（下次启动生效）", Toast.LENGTH_SHORT).show()
+                                }
+                            } else {
+                                viewModel.setPinEnabled(false)
+                                Toast.makeText(context, "启动密码验证已关闭（下次启动生效）", Toast.LENGTH_SHORT).show()
+                            }
                         }
                     }
                 )
@@ -112,6 +119,21 @@ fun SettingsScreen(
                 Divider(modifier = Modifier.padding(horizontal = 16.dp))
 
                 ChangePinSetting(onClick = { showChangePinDialog = true })
+            }
+
+            // 首次启用密码：设置新密码对话框
+            if (showSetupPinDialog) {
+                SetupPinDialog(
+                    onDismiss = { showSetupPinDialog = false },
+                    onConfirm = { newPin ->
+                        scope.launch {
+                            viewModel.setPin(newPin)
+                            viewModel.setPinEnabled(true)
+                            showSetupPinDialog = false
+                            Toast.makeText(context, "密码已设置，启动密码验证已开启", Toast.LENGTH_SHORT).show()
+                        }
+                    }
+                )
             }
 
             // Import Settings
@@ -434,6 +456,65 @@ fun ChangePinDialog(
 }
 
 /**
+ * 首次设置密码对话框（启用密码且尚未设置过时弹出）。
+ */
+@Composable
+fun SetupPinDialog(
+    onDismiss: () -> Unit,
+    onConfirm: (newPin: String) -> Unit
+) {
+    var newPin by remember { mutableStateOf("") }
+    var confirmNewPin by remember { mutableStateOf("") }
+    var error by remember { mutableStateOf<String?>(null) }
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("设置密码") },
+        text = {
+            Column {
+                OutlinedTextField(
+                    value = newPin,
+                    onValueChange = { newPin = it.filter(Char::isDigit).take(6) },
+                    label = { Text("新密码（4-6 位数字）") },
+                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.NumberPassword),
+                    visualTransformation = PasswordVisualTransformation(),
+                    singleLine = true
+                )
+                Spacer(modifier = Modifier.height(8.dp))
+                OutlinedTextField(
+                    value = confirmNewPin,
+                    onValueChange = { confirmNewPin = it.filter(Char::isDigit).take(6) },
+                    label = { Text("确认新密码") },
+                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.NumberPassword),
+                    visualTransformation = PasswordVisualTransformation(),
+                    singleLine = true
+                )
+                error?.let {
+                    Spacer(modifier = Modifier.height(8.dp))
+                    Text(
+                        text = it,
+                        color = MaterialTheme.colorScheme.error,
+                        style = MaterialTheme.typography.bodySmall
+                    )
+                }
+            }
+        },
+        confirmButton = {
+            TextButton(onClick = {
+                when {
+                    newPin.length < 4 || newPin.length > 6 -> error = "密码需为 4-6 位数字"
+                    newPin != confirmNewPin -> error = "两次输入的密码不一致"
+                    else -> onConfirm(newPin)
+                }
+            }) { Text("确定") }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) { Text("取消") }
+        }
+    )
+}
+
+/**
  * Grid size setting.
  */
 @Composable
@@ -710,7 +791,7 @@ data class SettingsState(
     val defaultSort: String = "最新优先",
     val reverseSort: Boolean = false,
     val cacheSizeMB: Int = 100,
-    val pinEnabled: Boolean = true,
+    val pinEnabled: Boolean = false,
     val autoDeleteOriginal: Boolean = false
 )
 
@@ -753,6 +834,14 @@ class SettingsViewModel @Inject constructor(
 
     suspend fun setPinEnabled(enabled: Boolean) {
         settingsManager.setPinEnabled(enabled)
+    }
+
+    suspend fun hasPin(): Boolean {
+        return settingsManager.hasPin()
+    }
+
+    suspend fun setPin(newPin: String) {
+        settingsManager.setPin(newPin)
     }
 
     suspend fun setAutoDeleteOriginal(enabled: Boolean) {

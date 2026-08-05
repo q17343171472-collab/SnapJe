@@ -34,6 +34,7 @@ object SettingsKeys {
     val PIN_LENGTH = intPreferencesKey("pin_length")
     val PIN_ENABLED = booleanPreferencesKey("pin_enabled")
     val AUTO_DELETE_ORIGINAL = booleanPreferencesKey("auto_delete_original")
+    val CATEGORY_ORDER = stringPreferencesKey("category_order")
 }
 
 /**
@@ -54,17 +55,17 @@ class SettingsManager @Inject constructor(
             defaultSort = preferences[SettingsKeys.DEFAULT_SORT] ?: "最新优先",
             reverseSort = preferences[SettingsKeys.REVERSE_SORT] ?: false,
             cacheSizeMB = preferences[SettingsKeys.CACHE_SIZE_MB] ?: 100,
-            pinEnabled = preferences[SettingsKeys.PIN_ENABLED] ?: true,
+            pinEnabled = preferences[SettingsKeys.PIN_ENABLED] ?: false,
             autoDeleteOriginal = preferences[SettingsKeys.AUTO_DELETE_ORIGINAL] ?: false
         )
     }
 
     /**
-     * 是否启用启动密码验证（默认开启，可在设置中关闭）。
+     * 是否启用启动密码验证（默认关闭；用户可在设置中开启）。
      */
     suspend fun isPinEnabled(): Boolean {
         return context.dataStore.data.map { prefs ->
-            prefs[SettingsKeys.PIN_ENABLED] ?: true
+            prefs[SettingsKeys.PIN_ENABLED] ?: false
         }.first()
     }
 
@@ -165,6 +166,25 @@ class SettingsManager @Inject constructor(
     suspend fun getGridColumns(): Int {
         return context.dataStore.data.map { prefs ->
             prefs[SettingsKeys.GRID_COLUMNS] ?: 3
+        }.first()
+    }
+
+    /**
+     * 保存分组手动排序（bucketId 顺序，逗号分隔）。
+     */
+    suspend fun saveCategoryOrder(ids: List<Long>) {
+        context.dataStore.edit { prefs ->
+            prefs[SettingsKeys.CATEGORY_ORDER] = ids.joinToString(",")
+        }
+    }
+
+    /**
+     * 读取分组手动排序顺序；未设置过返回 null（此时用默认排序）。
+     */
+    suspend fun getCategoryOrder(): List<Long>? {
+        return context.dataStore.data.map { prefs ->
+            val raw = prefs[SettingsKeys.CATEGORY_ORDER]
+            if (raw.isNullOrBlank()) null else raw.split(",").mapNotNull { it.toLongOrNull() }
         }.first()
     }
 
