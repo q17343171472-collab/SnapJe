@@ -1,8 +1,16 @@
-﻿package com.rapii.snapje.ui
+package com.rapii.snapje.ui
 
 import com.rapii.snapje.data.Category
-import com.rapii.snapje.data.CachedPhotoRepository
 import com.rapii.snapje.data.SortBy
+import com.rapii.snapje.data.VaultRepository
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.flow.flowOf
+import kotlinx.coroutines.test.StandardTestDispatcher
+import kotlinx.coroutines.test.resetMain
+import kotlinx.coroutines.test.runTest
+import kotlinx.coroutines.test.setMain
+import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertTrue
@@ -11,123 +19,135 @@ import org.junit.Test
 import org.mockito.Mock
 import org.mockito.Mockito.`when`
 import org.mockito.MockitoAnnotations
-import kotlinx.coroutines.flow.flowOf
-import kotlinx.coroutines.runBlocking
 
 /**
- * Unit tests for CategoryViewModel.
- * Validates category management and caching logic.
+ * Unit tests for CategoryViewModel (保险库数据源)。
  */
+@OptIn(ExperimentalCoroutinesApi::class)
 class CategoryViewModelTest {
 
     @Mock
-    private lateinit var cachedPhotoRepository: CachedPhotoRepository
+    private lateinit var vaultRepository: VaultRepository
+
+    private val testDispatcher = StandardTestDispatcher()
 
     private lateinit var viewModel: CategoryViewModel
 
     @Before
     fun setup() {
         MockitoAnnotations.openMocks(this)
+        Dispatchers.setMain(testDispatcher)
+    }
+
+    @After
+    fun teardown() {
+        Dispatchers.resetMain()
+    }
+
+    private fun createViewModel(): CategoryViewModel {
+        `when`(vaultRepository.getVaultPhotos()).thenReturn(flowOf(emptyList()))
+        return CategoryViewModel(vaultRepository)
     }
 
     @Test
-    fun `ViewModel should be created successfully`() {
-        // Given
-        `when`(cachedPhotoRepository.getCachedCategories()).thenReturn(flowOf(emptyList()))
-        
-        // When
-        viewModel = CategoryViewModel(cachedPhotoRepository)
-        
-        // Then
+    fun `ViewModel should be created successfully`() = runTest(testDispatcher) {
+        viewModel = createViewModel()
         assertNotNull(viewModel)
     }
 
     @Test
-    fun `getCachedCategories should return empty list when no cache exists`() {
-        // Given
-        `when`(cachedPhotoRepository.getCachedCategories()).thenReturn(flowOf(emptyList()))
-        viewModel = CategoryViewModel(cachedPhotoRepository)
-        
-        // When
-        val result = viewModel.getCachedCategories()
-        
-        // Then
-        assertNotNull(result)
-        assertTrue(result.isEmpty())
+    fun `getCachedCategories should return empty list when vault is empty`() = runTest(testDispatcher) {
+        viewModel = createViewModel()
+        testDispatcher.scheduler.advanceUntilIdle()
+
+        assertNotNull(viewModel.getCachedCategories())
+        assertTrue(viewModel.getCachedCategories().isEmpty())
     }
 
     @Test
-    fun `getCachedCategories should return cached categories when available`() {
-        // Given
-        val expectedCategories = listOf(
-            Category(id = 1, displayName = "Photos", path = "/storage/photos", bucketId = 100L),
-            Category(id = 2, displayName = "Downloads", path = "/storage/downloads", bucketId = 101L)
+    fun `getCachedCategories should build categories from vault photos`() = runTest(testDispatcher) {
+        // Given - 保险库内有两张照片，同属一个相册
+        val photos = listOf(
+            com.rapii.snapje.data.VaultPhoto(
+                id = "uuid-1",
+                originalName = "a.jpg",
+                bucketId = 100L,
+                bucketName = "我的保险库",
+                dateTaken = 1000L,
+                size = 10,
+                mimeType = "image/jpeg",
+                encryptedPath = "/x/a.enc"
+            ),
+            com.rapii.snapje.data.VaultPhoto(
+                id = "uuid-2",
+                originalName = "b.jpg",
+                bucketId = 100L,
+                bucketName = "我的保险库",
+                dateTaken = 2000L,
+                size = 20,
+                mimeType = "image/jpeg",
+                encryptedPath = "/x/b.enc"
+            )
         )
-        `when`(cachedPhotoRepository.getCachedCategories()).thenReturn(flowOf(expectedCategories))
-        viewModel = CategoryViewModel(cachedPhotoRepository)
-        
-        // Pre-populate cache
-        runBlocking {
-            // Simulate loading categories
-        }
-        
-        // When - Access cached data
-        val initialCache = viewModel.getCachedCategories()
-        
-        // Then - Initially empty before load
-        assertTrue(initialCache.isEmpty())
+        `when`(vaultRepository.getVaultPhotos()).thenReturn(flowOf(photos))
+
+        viewModel = CategoryViewModel(vaultRepository)
+        testDispatcher.scheduler.advanceUntilIdle()
+
+        // When
+        val categories = viewModel.getCachedCategories()
+
+        // Then - 两照片聚合为一个相册
+        assertEquals(1, categories.size)
+        assertEquals(100L, categories[0].id)
+        assertEquals(2, categories[0].itemCount)
     }
 
     @Test
-    fun `uiState should emit loading state initially`() {
-        // Given
-        `when`(cachedPhotoRepository.getCachedCategories()).thenReturn(flowOf(emptyList()))
-        viewModel = CategoryViewModel(cachedPhotoRepository)
-        
-        // When
-        val state = viewModel.uiState.value
-        
-        // Then
-        assertNotNull(state)
-        assertEquals(false, state.isLoading) // Should be false after init completes
+    fun `uiState should be empty when vault has no photos`() = runTest(testDispatcher) {
+        viewModel = createViewModel()
+        testDispatcher.scheduler.advanceUntilIdle()
+
+        assertNotNull(viewModel.uiState.value)
+        assertEquals(false, viewModel.uiState.value.isLoading)
+        assertTrue(viewModel.uiState.value.isEmpty)
     }
 
     @Test
-    fun `searchQuery should be empty by default`() {
-        // Given
-        `when`(cachedPhotoRepository.getCachedCategories()).thenReturn(flowOf(emptyList()))
-        viewModel = CategoryViewModel(cachedPhotoRepository)
-        
-        // When
-        val query = viewModel.searchQuery
-        
-        // Then
-        assertEquals("", query)
+    fun `searchQuery should be empty by default`() = runTest(testDispatcher) {
+        viewModel = createViewModel()
+        assertEquals("", viewModel.searchQuery)
     }
 
     @Test
-    fun `sortBy should default to RECENT`() {
-        // Given
-        `when`(cachedPhotoRepository.getCachedCategories()).thenReturn(flowOf(emptyList()))
-        viewModel = CategoryViewModel(cachedPhotoRepository)
-        
-        // When
-        val sort = viewModel.sortBy
-        
-        // Then
-        assertEquals(SortBy.RECENT, sort)
+    fun `sortBy should default to RECENT`() = runTest(testDispatcher) {
+        viewModel = createViewModel()
+        assertEquals(SortBy.RECENT, viewModel.sortBy)
     }
 
     @Test
-    fun `ViewModel should handle repository errors gracefully`() {
-        // Given
-        `when`(cachedPhotoRepository.getCachedCategories()).thenReturn(flowOf(emptyList()))
-        
-        // When
-        viewModel = CategoryViewModel(cachedPhotoRepository)
-        
-        // Then - Should not crash
-        assertNotNull(viewModel)
-        assertTrue(viewModel.uiState.value != null)
+    fun `toggleCategoryPin should update pinned state`() = runTest(testDispatcher) {
+        val photos = listOf(
+            com.rapii.snapje.data.VaultPhoto(
+                id = "uuid-1",
+                originalName = "a.jpg",
+                bucketId = 100L,
+                bucketName = "我的保险库",
+                dateTaken = 1000L,
+                size = 10,
+                mimeType = "image/jpeg",
+                encryptedPath = "/x/a.enc"
+            )
+        )
+        `when`(vaultRepository.getVaultPhotos()).thenReturn(flowOf(photos))
+        viewModel = CategoryViewModel(vaultRepository)
+        testDispatcher.scheduler.advanceUntilIdle()
+
+        val category = viewModel.getCachedCategories().first()
+        assertTrue(!category.isPinned)
+
+        viewModel.toggleCategoryPin(category.id)
+        val updated = viewModel.getCachedCategories().first()
+        assertTrue(updated.isPinned)
     }
 }

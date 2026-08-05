@@ -47,9 +47,7 @@ import com.rapii.snapje.data.TrashRepository
 import com.rapii.snapje.ui.components.CopyToDialog
 import com.rapii.snapje.ui.components.FileOperationsBottomSheet
 import com.rapii.snapje.ui.components.RenameDialog
-import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.withContext
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
@@ -58,6 +56,9 @@ import kotlin.math.pow
 
 /**
  * Photo Gallery Screen with smooth swipe navigation and pinch-to-zoom.
+ *
+ * @param vaultFullImageProvider 保险库照片的解密原图 URI 提供者（全屏显示时按需解密到临时文件）；
+ *                               非保险库照片不使用。
  */
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalFoundationApi::class)
 @Composable
@@ -66,26 +67,22 @@ fun PhotoGalleryScreen(
     initialPhotoIndex: Int = 0,
     onBack: () -> Unit,
     onShare: (PhotoItem) -> Unit = {},
-    allCategories: List<com.rapii.snapje.data.Category> = emptyList()
+    allCategories: List<com.rapii.snapje.data.Category> = emptyList(),
+    vaultFullImageProvider: suspend (PhotoItem) -> Uri? = { null },
+    /** 保险库照片删除回调（生物识别确认后触发） */
+    vaultDeleteHandler: ((PhotoItem) -> Unit)? = null
 ) {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
 
     var categories by remember { mutableStateOf<List<com.rapii.snapje.data.Category>>(allCategories) }
-    var isLoadingCategories by remember { mutableStateOf(allCategories.isEmpty()) }
+    var isLoadingCategories by remember { mutableStateOf(false) }
 
-    LaunchedEffect(Unit) {
-        if (allCategories.isEmpty()) {
-            withContext(Dispatchers.IO) {
-                val photoRepo = com.rapii.snapje.data.PhotoRepository(context.contentResolver)
-                categories = photoRepo.getCategories()
-            }
-            isLoadingCategories = false
-        }
-    }
+    // 保险库照片删除确认（生物识别）
+    var vaultPendingDelete by remember { mutableStateOf<PhotoItem?>(null) }
 
     val imageLoader = remember(context) {
-        ImageLoaderFactory.createFullscreenLoader(context)
+        ImageLoaderFactory.createVaultLoader(context)
     }
 
     val fileOperations = remember { FileOperations(context) }
@@ -250,6 +247,7 @@ fun PhotoGalleryScreen(
                     photo = photos[pageIndex],
                     imageLoader = imageLoader,
                     isCurrentPage = isCurrentPage,
+                    vaultFullImageProvider = vaultFullImageProvider,
                     onZoomStateChanged = { zoomed ->
                         if (isCurrentPage) {
                             isPagingEnabled = !zoomed
@@ -273,9 +271,26 @@ fun PhotoGalleryScreen(
                     photoName = currentPhoto.displayName,
                     onDismiss = { showOperationsMenu = false },
                     onOperation = { operation ->
+                        // 保险库照片：复制 / 移动 / 裁剪 / 隐藏 / 重命名不支持
+                        if (currentPhoto.isVaultPhoto && operation in setOf(
+                                FileOperationType.RENAME,
+                                FileOperationType.COPY,
+                                FileOperationType.MOVE,
+                                FileOperationType.CROP,
+                                FileOperationType.HIDE
+                            )
+                        ) {
+                            showOperationsMenu = false
+                            Toast.makeText(context, "该操作仅支持系统相册照片", Toast.LENGTH_SHORT).show()
+                            return@FileOperationsBottomSheet
+                        }
                         when (operation) {
                             FileOperationType.DELETE -> {
                                 showOperationsMenu = false
+                                if (currentPhoto.isVaultPhoto) {
+                                    vaultPendingDelete = currentPhoto
+                                    return@FileOperationsBottomSheet
+                                }
                                 scope.launch {
                                     when (val result = trashRepository.moveToTrash(currentPhoto)) {
                                         is FileOperationResult.Success -> {
@@ -321,6 +336,19 @@ fun PhotoGalleryScreen(
                             }
                         }
                     }
+                )
+            }
+
+            // 保险库照片删除确认（生物识别）
+            vaultPendingDelete?.let { photo ->
+                com.rapii.snapje.ui.components.PatternLockDialog(
+                    onDismiss = { vaultPendingDelete = null },
+                    onUnlock = {
+                        val pending = vaultPendingDelete
+                        vaultPendingDelete = null
+                        pending?.let { vaultDeleteHandler?.invoke(it) }
+                    },
+                    title = "删除保险库照片"
                 )
             }
 
@@ -411,11 +439,25 @@ fun PhotoPage(
     photo: PhotoItem,
     imageLoader: ImageLoader,
     isCurrentPage: Boolean,
-    onZoomStateChanged: (Boolean) -> Unit
+    onZoomStateChanged: (Boolean) -> Unit,
+    vaultFullImageProvider: suspend (PhotoItem) -> Uri? = { null }
 ) {
     var scale by remember { mutableFloatStateOf(1f) }
     var offset by remember { mutableStateOf(Offset.Zero) }
     var isZoomed by remember { mutableStateOf(false) }
+
+    // 保险库照片：当前页可见时按需解密原图到临时文件（展示前先显示缩略图）
+    var fullDisplayUri by remember(photo.vaultId) { mutableStateOf<Uri?>(null) }
+    LaunchedEffect(isCurrentPage, photo.vaultId) {
+        if (photo.isVaultPhoto && isCurrentPage) {
+            val cached = fullDisplayUri
+            // 临时文件可能被清理（上锁/过期），失效时重新解密
+            if (cached == null || !java.io.File(cached.path.orEmpty()).exists()) {
+                fullDisplayUri = runCatching { vaultFullImageProvider(photo) }.getOrNull()
+            }
+        }
+    }
+    val displayUri = fullDisplayUri ?: photo.uri
     
     // Smooth zoom animation using spring (less bouncy for smoother feel)
     val targetScale by animateFloatAsState(
@@ -546,7 +588,7 @@ fun PhotoPage(
     ) {
         AsyncImage(
             model = ImageRequest.Builder(LocalContext.current)
-                .data(photo.uri)
+                .data(displayUri)
                 .crossfade(false)
                 .size(Size.ORIGINAL)
                 .bitmapConfig(Bitmap.Config.ARGB_8888)
@@ -599,9 +641,14 @@ fun GalleryPhotoInfoOverlay(
             InfoRow(label = "Filename", value = photo.displayName)
             InfoRow(label = "Uri", value = photo.uri.toString())
 
-            val date = Date(photo.dateTaken * 1000L)
-            val sdf = SimpleDateFormat("MMM dd, yyyy HH:mm", Locale.getDefault())
-            InfoRow(label = "Date", value = sdf.format(date))
+            // MediaStore DATE_TAKEN / VaultPhoto.dateTaken 均为毫秒时间戳，勿再乘 1000
+            val dateText = if (photo.dateTaken > 0) {
+                SimpleDateFormat("MMM dd, yyyy HH:mm", Locale.getDefault())
+                    .format(Date(photo.dateTaken))
+            } else {
+                "Unknown"
+            }
+            InfoRow(label = "Date", value = dateText)
 
             InfoRow(label = "Size", value = formatFileSize(photo.size))
             InfoRow(label = "Mime Type", value = photo.mimeType)

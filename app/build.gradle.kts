@@ -95,6 +95,11 @@ dependencies {
     // DataStore for settings persistence
     implementation(libs.androidx.datastore.preferences)
 
+    // Android Security Crypto (AES-256-GCM encryption + Keystore-backed MasterKey)
+    implementation(libs.androidx.security.crypto)
+    // Biometric authentication (fingerprint / face unlock)
+    implementation(libs.androidx.biometric)
+
     // Subsampling Scale Image View for progressive image loading with pinch-to-zoom
     implementation(libs.subsampling.scale.image.view)
     

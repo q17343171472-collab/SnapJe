@@ -1,33 +1,35 @@
-﻿package com.rapii.snapje.ui
+package com.rapii.snapje.ui
 
+import android.net.Uri
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.rapii.snapje.data.Category
-import com.rapii.snapje.data.CachedPhotoRepository
+import com.rapii.snapje.data.Result
 import com.rapii.snapje.data.SortBy
+import com.rapii.snapje.data.VaultPhoto
+import com.rapii.snapje.data.VaultRepository
 import com.rapii.snapje.util.L
 import dagger.hilt.android.lifecycle.HiltViewModel
-import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
-import kotlinx.coroutines.flow.firstOrNull
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import javax.inject.Inject
 
 /**
- * ViewModel for managing categories (folders) in PhotoX.
- * Implements caching to improve navigation performance.
+ * ViewModel for managing categories (保险库相册) in SnapJe!.
  *
- * Uses Hilt for dependency injection.
+ * 数据源已从 MediaStore 改为 [VaultRepository]（加密保险库）：
+ * - 首页只展示保险库内的加密照片分组，系统相册不可见。
+ * - 分组依据导入时选择的相册名（bucketName）。
  */
 @HiltViewModel
 class CategoryViewModel @Inject constructor(
-    private val cachedPhotoRepository: CachedPhotoRepository
+    private val vaultRepository: VaultRepository
 ) : ViewModel() {
 
     // UI state
@@ -42,17 +44,47 @@ class CategoryViewModel @Inject constructor(
     var sortBy by mutableStateOf(SortBy.RECENT)
         private set
 
-    // Refresh job to prevent multiple refreshes
-    private var refreshJob: Job? = null
-
     // Cached categories - shared across app for faster navigation
     private var cachedCategories: List<Category> = emptyList()
 
     init {
-        // Only load if not already cached (prevents redundant loads on back navigation)
-        if (cachedCategories.isEmpty()) {
-            loadCategories()
+        observeVault()
+    }
+
+    /**
+     * 订阅保险库照片 Flow：照片增删时自动重建分组列表。
+     */
+    private fun observeVault() {
+        viewModelScope.launch {
+            vaultRepository.getVaultPhotos().collect { photos ->
+                L.d("CategoryVM", "Vault photos updated: ${photos.size}")
+                buildCategories(photos)
+            }
         }
+    }
+
+    /**
+     * 从保险库照片构建分组（按 bucketId 聚合，封面取前 4 张解密缩略图）。
+     */
+    private suspend fun buildCategories(photos: List<VaultPhoto>) {
+        val grouped = photos.groupBy { it.bucketId }
+        val categories = grouped.map { (bucketId, list) ->
+            val bucketName = list.first().bucketName.ifBlank { VaultRepository.DEFAULT_ALBUM }
+            val covers = mutableListOf<Uri>()
+            for (photo in list.take(4)) {
+                runCatching { vaultRepository.thumbnailUri(photo) }.getOrNull()?.let { covers.add(it) }
+            }
+            Category(
+                id = bucketId,
+                name = bucketName,
+                path = "",
+                coverUris = covers,
+                itemCount = list.size,
+                lastModified = list.maxOf { it.dateTaken }
+            )
+        }
+        cachedCategories = categories
+        applyFilters()
     }
 
     /**
@@ -60,66 +92,29 @@ class CategoryViewModel @Inject constructor(
      */
     fun getCachedCategories(): List<Category> = cachedCategories
 
+    /**
+     * 保险库数据由 Flow 自动推送，无需手动刷新（保留接口以兼容旧调用）。
+     */
     fun loadCategories() {
-        refreshJob?.cancel()
-        refreshJob = viewModelScope.launch {
-            try {
-                _uiState.update { it.copy(isLoading = true, error = null) }
-
-                // First, load from cache for instant UI
-                val cachedCats = cachedPhotoRepository.getCachedCategories().firstOrNull()
-                if (!cachedCats.isNullOrEmpty()) {
-                    cachedCategories = cachedCats
-                    val filteredCategories = filterAndSortCategories(cachedCats)
-                    _uiState.update {
-                        it.copy(
-                            categories = filteredCategories,
-                            isLoading = false,
-                            isEmpty = filteredCategories.isEmpty()
-                        )
-                    }
-                }
-
-                // Then refresh from MediaStore in background
-                val freshCategories = cachedPhotoRepository.refreshCategories().getOrNull()
-                if (freshCategories != null) {
-                    cachedCategories = freshCategories
-                    val filteredCategories = filterAndSortCategories(freshCategories)
-                    _uiState.update {
-                        it.copy(
-                            categories = filteredCategories,
-                            isLoading = false,
-                            isEmpty = filteredCategories.isEmpty()
-                        )
-                    }
-                } else if (cachedCats.isNullOrEmpty()) {
-                    // No cache and no MediaStore - show error
-                    _uiState.update {
-                        it.copy(
-                            isLoading = false,
-                            error = "No photos found",
-                            isEmpty = true
-                        )
-                    }
-                }
-            } catch (e: kotlinx.coroutines.CancellationException) {
-                // CRITICAL: Log cancellation but don't propagate to UI
-                L.d("CategoryVM", "Load cancelled - likely due to navigation")
-                return@launch
-            } catch (e: Exception) {
-                L.e("CategoryVM", "Failed to load categories: ${e.message}", e)
-                _uiState.update {
-                    it.copy(
-                        error = e.message ?: "Failed to load categories",
-                        isLoading = false
-                    )
-                }
-            }
-        }
+        applyFilters()
     }
 
     fun refreshCategories() {
-        loadCategories()
+        applyFilters()
+    }
+
+    /**
+     * 导入照片到保险库（加密存储）。
+     */
+    suspend fun addPhotoToVault(uri: Uri, albumName: String): Result<VaultPhoto> {
+        return vaultRepository.addPhotoToVault(uri, albumName)
+    }
+
+    /**
+     * 获取已有相册名列表（导入时选择用）。
+     */
+    suspend fun getAlbumNames(): List<String> {
+        return vaultRepository.getAlbumNames()
     }
 
     fun updateSearchQuery(query: String) {
@@ -161,33 +156,27 @@ class CategoryViewModel @Inject constructor(
     }
 
     private fun applyFilters() {
-        val currentCategories = _uiState.value.categories
-        val filteredCategories = filterAndSortCategories(currentCategories)
-
-        _uiState.update {
-            it.copy(
-                categories = filteredCategories,
-                isEmpty = filteredCategories.isEmpty()
-            )
-        }
-    }
-
-    private fun filterAndSortCategories(categories: List<Category>): List<Category> {
-        // Filter by search query
+        val currentCategories = cachedCategories
         val filtered = if (searchQuery.isBlank()) {
-            categories
+            currentCategories
         } else {
-            categories.filter { category ->
+            currentCategories.filter { category ->
                 category.name.contains(searchQuery, ignoreCase = true) ||
-                category.path.contains(searchQuery, ignoreCase = true)
+                    category.path.contains(searchQuery, ignoreCase = true)
             }
         }
 
-        // Filter out hidden categories
         val visibleCategories = filtered.filter { !it.isHidden }
 
-        // Sort by selected criteria
-        return Category.sortCategories(visibleCategories, sortBy)
+        val sortedCategories = Category.sortCategories(visibleCategories, sortBy)
+
+        _uiState.update {
+            it.copy(
+                categories = sortedCategories,
+                isLoading = false,
+                isEmpty = sortedCategories.isEmpty()
+            )
+        }
     }
 
     fun clearError() {

@@ -50,6 +50,9 @@ data class PhotoInfo(
 /**
  * Manager for file operations on photos.
  * Uses application context to avoid memory leaks.
+ *
+ * 注意：SnapJe 主流程已切换为加密保险库，保险库照片的删除/重命名由 VaultRepository 处理。
+ * 本类仅保留给系统相册照片路径（复制/移动/裁剪/隐藏等），通常不再触发。
  */
 class FileOperations(context: Context) {
 

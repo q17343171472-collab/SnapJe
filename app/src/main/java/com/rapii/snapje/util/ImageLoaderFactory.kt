@@ -117,4 +117,40 @@ object ImageLoaderFactory {
             .respectCacheHeaders(false)
             .build()
     }
+
+    /**
+     * 保险库专用加载器：只启用内存缓存，禁用磁盘缓存。
+     *
+     * 保险库照片的展示源是「解密后的临时文件」，若再被 Coil 写入磁盘缓存，
+     * 会在 coil_* 目录留下不受管控的明文副本，违背保险库的隐私模型。
+     */
+    fun createVaultLoader(context: Context): ImageLoader {
+        return ImageLoader.Builder(context)
+            .memoryCachePolicy(CachePolicy.ENABLED)
+            .diskCachePolicy(CachePolicy.DISABLED)
+            .memoryCache {
+                MemoryCache.Builder(context)
+                    .maxSizePercent(Constants.IMAGE_MEMORY_CACHE_PERCENT)
+                    .build()
+            }
+            .crossfade(false)
+            .respectCacheHeaders(false)
+            .build()
+    }
+
+    /**
+     * 清空全部 Coil 磁盘缓存（含默认单例的 image_cache），用于上锁 / 启动时清理明文残留。
+     */
+    fun clearAllDiskCaches(context: Context) {
+        val cacheDir = context.cacheDir
+        listOf(
+            "coil_standard",
+            "coil_fullscreen",
+            "coil_thumbnail",
+            "coil_trash",
+            "image_cache"
+        ).forEach { name ->
+            runCatching { java.io.File(cacheDir, name).deleteRecursively() }
+        }
+    }
 }

@@ -19,6 +19,11 @@ import javax.inject.Singleton
 /**
  * Repository for accessing photos from MediaStore.
  * Implements PhotoRepositoryInterface for testability and dependency injection.
+ *
+ * 注意：SnapJe 已改造为加密保险库，主流程（首页 / 分类详情 / 搜索）不再通过
+ * MediaStore 展示照片。本类保留用于：
+ * 1) 导入源（Photo Picker / 相机返回的 URI 直接交给 VaultRepository 加密）；
+ * 2) 系统相册照片的回收站 / 旧测试。
  */
 @Singleton
 class PhotoRepository @Inject constructor(

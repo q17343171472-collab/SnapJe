@@ -28,6 +28,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.stringResource
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -46,8 +47,8 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import com.rapii.snapje.data.PhotoInfo
 import com.rapii.snapje.data.PhotoItem
+import com.rapii.snapje.data.Result
 import com.rapii.snapje.util.L
-import com.rapii.snapje.data.PhotoRepository
 import com.rapii.snapje.data.PhotoSortOption
 import com.rapii.snapje.data.TrashRepository
 import com.rapii.snapje.data.TrashedPhoto
@@ -132,6 +133,8 @@ fun CategoryDetailScreen(
     LaunchedEffect(showPhotoGallery, savedScrollState) {
         if (!showPhotoGallery && savedScrollState != null) {
             shouldRestoreScroll = true
+            // 退出全屏后自动删除解密原图临时文件（保留网格缩略图缓存）
+            viewModel.clearFullImageCache()
         }
     }
 
@@ -190,7 +193,25 @@ fun CategoryDetailScreen(
             initialPhotoIndex = galleryInitialIndex,
             onBack = { showPhotoGallery = false },
             onShare = { photo -> viewModel.sharePhoto(photo) },
-            allCategories = allCategories
+            allCategories = allCategories,
+            vaultFullImageProvider = { photo -> viewModel.fullImageUri(photo) },
+            vaultDeleteHandler = { photo ->
+                scope.launch {
+                    when (val result = viewModel.deleteVaultPhoto(photo)) {
+                        is Result.Success -> {
+                            Toast.makeText(
+                                context,
+                                context.getString(R.string.vault_photo_deleted),
+                                Toast.LENGTH_SHORT
+                            ).show()
+                            viewModel.removePhotoFromList(photo)
+                        }
+                        is Result.Error -> {
+                            Toast.makeText(context.applicationContext, result.message, Toast.LENGTH_LONG).show()
+                        }
+                    }
+                }
+            }
         )
         return
     }
@@ -454,6 +475,24 @@ fun CategoryDetailScreen(
     fun handleFileOperation(operation: FileOperationType) {
         val photo = selectedPhoto ?: return
 
+        // 保险库照片仅支持：删除 / 重命名 / 分享 / 信息（复制、移动、裁剪、隐藏仅适用于系统相册照片）
+        if (photo.isVaultPhoto && operation in setOf(
+                FileOperationType.COPY,
+                FileOperationType.MOVE,
+                FileOperationType.CROP,
+                FileOperationType.HIDE
+            )
+        ) {
+            Toast.makeText(
+                context,
+                context.getString(R.string.vault_op_not_supported),
+                Toast.LENGTH_SHORT
+            ).show()
+            showOperationsMenu = false
+            selectedPhoto = null
+            return
+        }
+
         when (operation) {
             FileOperationType.COPY -> { showOperationsMenu = false; showCopyDialog = true; return }
             FileOperationType.MOVE -> { showOperationsMenu = false; showMoveDialog = true; return }
@@ -476,7 +515,7 @@ fun CategoryDetailScreen(
                             noMediaFile.createNewFile()
                         }
                         // Also rename the photo to start with a dot
-                        val currentName = photo.name
+                        val currentName = photo.displayName
                         if (!currentName.startsWith(".")) {
                             val hiddenName = ".$currentName"
                             // Note: Actual renaming requires MediaStore operations
@@ -503,14 +542,13 @@ fun CategoryDetailScreen(
                         showPatternLockForDelete = true
                         return
                     }
-                    }
                     FileOperationType.RENAME -> { showRenameDialog = true; return@launch }
                     FileOperationType.SHARE -> {
                         showOperationsMenu = false
                         selectedPhoto = null
-                        // Share doesn't need IO dispatcher as it just launches an Intent
+                        // 保险库/系统照片统一走 ViewModel（保险库会解密原图后分享）
                         try {
-                            fileOperations.sharePhoto(photo)
+                            viewModel.sharePhoto(photo)
                         } catch (e: Exception) {
                             Toast.makeText(context.applicationContext, "Share failed: ${e.message}", Toast.LENGTH_LONG).show()
                         }
@@ -618,7 +656,29 @@ fun CategoryDetailScreen(
     // Function to handle batch delete of selected photos
     fun handleBatchDelete() {
         scope.launch {
-            when (val result = trashRepository.moveToTrashBatch(selectedPhotos.toList())) {
+            val photosToDelete = selectedPhotos.toList()
+
+            // 保险库照片：直接批量删除
+            if (photosToDelete.isNotEmpty() && photosToDelete.all { it.isVaultPhoto }) {
+                var failed = 0
+                photosToDelete.forEach { photo ->
+                    when (val result = viewModel.deleteVaultPhoto(photo)) {
+                        is Result.Success -> viewModel.removePhotoFromList(photo)
+                        is Result.Error -> failed++
+                    }
+                }
+                snackbarHostState.showSnackbar(
+                    context.getString(
+                        R.string.vault_photos_deleted,
+                        photosToDelete.size - failed
+                    )
+                )
+                isSelectionMode = false
+                selectedPhotos = emptySet()
+                return@launch
+            }
+
+            when (val result = trashRepository.moveToTrashBatch(photosToDelete)) {
                 is FileOperationResult.Success -> {
                     snackbarHostState.showSnackbar(result.message)
                     selectedPhotos.forEach { photo ->
@@ -707,9 +767,9 @@ fun CategoryDetailScreen(
                     uiState.photos.isEmpty() -> {
                         Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                             Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                                Text(text = "No photos in this folder", style = MaterialTheme.typography.titleMedium)
+                                Text(text = stringResource(R.string.vault_empty), style = MaterialTheme.typography.titleMedium)
                                 Text(
-                                    text = "Take some photos or move images here",
+                                    text = stringResource(R.string.vault_empty_message),
                                     style = MaterialTheme.typography.bodyMedium,
                                     color = MaterialTheme.colorScheme.onSurfaceVariant
                                 )
@@ -805,6 +865,25 @@ fun CategoryDetailScreen(
                 onDismiss = { showRenameDialog = false; selectedPhoto = null },
                 onConfirm = { newName ->
                     scope.launch {
+                        // 保险库照片：直接改显示名
+                        if (photo.isVaultPhoto) {
+                            when (val result = viewModel.renameVaultPhoto(photo, newName)) {
+                                is Result.Success -> {
+                                    Toast.makeText(
+                                        context.applicationContext,
+                                        context.getString(R.string.vault_renamed),
+                                        Toast.LENGTH_SHORT
+                                    ).show()
+                                    viewModel.updatePhotoName(photo, newName)
+                                }
+                                is Result.Error -> {
+                                    Toast.makeText(context.applicationContext, result.message, Toast.LENGTH_LONG).show()
+                                }
+                            }
+                            showRenameDialog = false
+                            selectedPhoto = null
+                            return@launch
+                        }
                         try {
                             // Run rename on IO thread
                             val result = withContext(Dispatchers.IO) {
@@ -871,6 +950,24 @@ fun CategoryDetailScreen(
                 // Proceed with deletion after successful unlock
                 photoPendingDeleteAfterLock?.let { photoToDelete ->
                     scope.launch {
+                        // 保险库照片：直接删除（密文文件 + DB 记录）
+                        if (photoToDelete.isVaultPhoto) {
+                            when (val result = viewModel.deleteVaultPhoto(photoToDelete)) {
+                                is Result.Success -> {
+                                    Toast.makeText(
+                                        context,
+                                        context.getString(R.string.vault_photo_deleted),
+                                        Toast.LENGTH_SHORT
+                                    ).show()
+                                    viewModel.removePhotoFromList(photoToDelete)
+                                }
+                                is Result.Error -> {
+                                    Toast.makeText(context.applicationContext, result.message, Toast.LENGTH_LONG).show()
+                                }
+                            }
+                            photoPendingDeleteAfterLock = null
+                            return@launch
+                        }
                         try {
                             val result = withContext(Dispatchers.IO) {
                                 trashRepository.moveToTrash(photoToDelete)
@@ -901,7 +998,7 @@ fun CategoryDetailScreen(
                     }
                 }
             },
-            title = "Enter PIN to delete photo"
+            title = stringResource(R.string.delete_vault_photo)
         )
     }
 }

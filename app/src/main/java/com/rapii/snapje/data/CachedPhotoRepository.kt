@@ -19,11 +19,9 @@ import javax.inject.Singleton
 /**
  * Repository for cached category and photo data.
  * Uses Room database for offline access and faster loading.
- * 
- * Caching strategy:
- * 1. Load from cache immediately (fast)
- * 2. Refresh from MediaStore in background
- * 3. Update cache with fresh data
+ *
+ * 注意：SnapJe 主流程已切换为 VaultRepository（加密保险库），
+ * 本类保留仅用于旧测试与系统相册照片路径的兼容。
  */
 @Singleton
 class CachedPhotoRepository @Inject constructor(

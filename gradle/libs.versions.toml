@@ -26,6 +26,8 @@ datastore = "1.1.2"
 subsamplingScaleImageView = "3.10.0"
 mockito = "5.15.0"
 coreSplashscreen = "1.0.1"
+securityCrypto = "1.1.0-alpha06"
+biometric = "1.1.0"
 
 [libraries]
 androidx-core-splashscreen = { group = "androidx.core", name = "core-splashscreen", version = "1.0.1" }
@@ -64,6 +66,10 @@ androidx-room-paging = { group = "androidx.room", name = "room-paging", version.
 
 # Timber
 timber = { group = "com.jakewharton.timber", name = "timber", version.ref = "timber" }
+
+# Security (Keystore-backed encryption + biometric auth)
+androidx-security-crypto = { group = "androidx.security", name = "security-crypto", version.ref = "securityCrypto" }
+androidx-biometric = { group = "androidx.biometric", name = "biometric", version.ref = "biometric" }
 
 # DataStore for settings persistence
 androidx-datastore-preferences = { group = "androidx.datastore", name = "datastore-preferences", version.ref = "datastore" }

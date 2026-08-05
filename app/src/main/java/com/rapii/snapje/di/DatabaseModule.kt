@@ -4,6 +4,7 @@ import android.content.Context
 import com.rapii.snapje.data.local.CategoryDao
 import com.rapii.snapje.data.local.PhotoDao
 import com.rapii.snapje.data.local.SnapJeDatabase
+import com.rapii.snapje.data.local.VaultPhotoDao
 import dagger.Module
 import dagger.Provides
 import dagger.hilt.InstallIn
@@ -34,6 +35,15 @@ object DatabaseModule {
     @Singleton
     fun providePhotoDao(database: SnapJeDatabase): PhotoDao {
         return database.photoDao()
+    }
+
+    /**
+     * Provide Vault Photo DAO (encrypted vault).
+     */
+    @Provides
+    @Singleton
+    fun provideVaultPhotoDao(database: SnapJeDatabase): VaultPhotoDao {
+        return database.vaultPhotoDao()
     }
 
     /**

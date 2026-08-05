@@ -23,6 +23,7 @@ class CameraLauncher @Inject constructor() {
 
     private var activity: ComponentActivity? = null
     private var photoUri: Uri? = null
+    private var photoFile: File? = null
     private var onPhotoCaptured: ((Uri) -> Unit)? = null
 
     /**
@@ -69,7 +70,8 @@ class CameraLauncher @Inject constructor() {
      */
     fun createCaptureIntent(context: Context): Intent {
         val photoFile = createImageFile(context)
-        
+        this.photoFile = photoFile
+
         photoUri = FileProvider.getUriForFile(
             context,
             "${context.packageName}.fileprovider",
@@ -97,10 +99,16 @@ class CameraLauncher @Inject constructor() {
     fun getLastPhotoUri(): Uri? = photoUri
 
     /**
+     * Get the real file of the last captured photo（用于导入成功后删除明文）。
+     */
+    fun getLastPhotoFile(): File? = photoFile
+
+    /**
      * Clear the last photo URI.
      */
     fun clearPhotoUri() {
         photoUri = null
+        photoFile = null
     }
 
     /**
@@ -110,5 +118,6 @@ class CameraLauncher @Inject constructor() {
         activity = null
         onPhotoCaptured = null
         photoUri = null
+        photoFile = null
     }
 }

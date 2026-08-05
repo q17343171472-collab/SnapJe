@@ -35,7 +35,6 @@ import coil.compose.AsyncImage
 import coil.request.ImageRequest
 import com.rapii.snapje.R
 import com.rapii.snapje.data.PhotoItem
-import com.rapii.snapje.data.PhotoRepositoryInterface
 import com.rapii.snapje.data.SearchResult
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.FlowPreview
@@ -239,11 +238,17 @@ private fun PhotoGridItem(
     photo: PhotoItem,
     modifier: Modifier = Modifier
 ) {
+    val context = LocalContext.current
+    // 保险库照片使用无磁盘缓存的加载器（避免解密明文被 Coil 落盘）
+    val vaultLoader = remember(context) {
+        com.rapii.snapje.util.ImageLoaderFactory.createVaultLoader(context)
+    }
     AsyncImage(
         model = ImageRequest.Builder(LocalContext.current)
             .data(photo.uri)
             .crossfade(false)
             .build(),
+        imageLoader = vaultLoader,
         contentDescription = photo.displayName,
         contentScale = ContentScale.Crop,
         modifier = modifier.fillMaxSize()
@@ -259,11 +264,12 @@ data class SearchUiState(
 
 /**
  * ViewModel for search functionality.
+ * 搜索保险库（加密）照片：结果使用解密后的缩略图 URI 展示。
  */
 @OptIn(kotlinx.coroutines.FlowPreview::class)
 @HiltViewModel
 class SearchViewModel @Inject constructor(
-    private val photoRepository: PhotoRepositoryInterface
+    private val vaultRepository: com.rapii.snapje.data.VaultRepository
 ) : ViewModel() {
 
     private val _searchQuery = MutableStateFlow("")
@@ -271,6 +277,8 @@ class SearchViewModel @Inject constructor(
 
     private val _searchState = MutableStateFlow(SearchUiState())
     val searchState: StateFlow<SearchUiState> = _searchState.asStateFlow()
+
+    private var searchJob: kotlinx.coroutines.Job? = null
 
     init {
         viewModelScope.launch {
@@ -280,6 +288,7 @@ class SearchViewModel @Inject constructor(
                     if (query.isNotBlank()) {
                         performSearch(query)
                     } else {
+                        searchJob?.cancel()
                         _searchState.value = SearchUiState()
                     }
                 }
@@ -291,15 +300,24 @@ class SearchViewModel @Inject constructor(
     }
 
     private fun performSearch(query: String) {
-        viewModelScope.launch {
+        searchJob?.cancel()
+        searchJob = viewModelScope.launch {
             try {
                 _searchState.value = _searchState.value.copy(isLoading = true)
-                val result = photoRepository.searchPhotos(query)
-                _searchState.value = SearchUiState(
-                    isLoading = false,
-                    photos = result.photos,
-                    query = result.query
-                )
+                vaultRepository.searchPhotos(query).collect { vaultPhotos ->
+                    val photoItems = mutableListOf<PhotoItem>()
+                    for (vp in vaultPhotos) {
+                        val thumbUri = runCatching { vaultRepository.thumbnailUri(vp) }.getOrNull()
+                        if (thumbUri != null) {
+                            photoItems.add(vp.toPhotoItem(thumbUri))
+                        }
+                    }
+                    _searchState.value = SearchUiState(
+                        isLoading = false,
+                        photos = photoItems,
+                        query = query
+                    )
+                }
             } catch (e: Exception) {
                 _searchState.value = SearchUiState(
                     isLoading = false,

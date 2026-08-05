@@ -241,9 +241,9 @@ fun CategoryThumbnail(
 ) {
     val context = LocalContext.current
     
-    // CRITICAL: Use thumbnail-optimized image loader for faster grid loading
+    // CRITICAL: 保险库封面使用无磁盘缓存的加载器（避免解密明文被 Coil 落盘）
     val thumbnailLoader = remember(context) {
-        com.rapii.snapje.util.ImageLoaderFactory.createThumbnailLoader(context)
+        com.rapii.snapje.util.ImageLoaderFactory.createVaultLoader(context)
     }
     
     val imageRequest = remember(category.coverUris, context) {

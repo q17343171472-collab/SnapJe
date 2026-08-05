@@ -13,14 +13,15 @@ import javax.inject.Singleton
  * Provides local caching for categories and photos.
  * 
  * Database name: snapje_database
- * Version: 1
+ * Version: 2 (added vault_photos table for encrypted vault storage)
  */
 @Database(
     entities = [
         CategoryEntity::class,
-        PhotoEntity::class
+        PhotoEntity::class,
+        VaultPhotoEntity::class
     ],
-    version = 1,
+    version = 2,
     exportSchema = true
 )
 @TypeConverters(Converters::class)
@@ -36,9 +37,40 @@ abstract class SnapJeDatabase : RoomDatabase() {
      */
     abstract fun photoDao(): PhotoDao
 
+    /**
+     * Get Vault Photo DAO for encrypted vault photos.
+     */
+    abstract fun vaultPhotoDao(): VaultPhotoDao
+
     companion object {
         const val DATABASE_NAME = "snapje_database"
-        
+
+        /**
+         * Migration 1 -> 2: 新增 vault_photos 表（保险库加密照片元数据）。
+         * 表结构与 VaultPhotoEntity 一致（含索引），保证 Room 的 schema 校验通过。
+         */
+        val MIGRATION_1_2 = object : Migration(1, 2) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL(
+                    """CREATE TABLE IF NOT EXISTS `vault_photos` (
+                        `id` TEXT NOT NULL, 
+                        `originalName` TEXT NOT NULL, 
+                        `bucketId` INTEGER NOT NULL, 
+                        `bucketName` TEXT NOT NULL, 
+                        `dateTaken` INTEGER NOT NULL, 
+                        `size` INTEGER NOT NULL, 
+                        `mimeType` TEXT NOT NULL, 
+                        `encryptedPath` TEXT NOT NULL, 
+                        `thumbnailPath` TEXT NOT NULL DEFAULT '', 
+                        PRIMARY KEY(`id`)
+                    )"""
+                )
+                db.execSQL("CREATE INDEX IF NOT EXISTS `index_vault_photos_bucketId` ON `vault_photos` (`bucketId`)")
+                db.execSQL("CREATE INDEX IF NOT EXISTS `index_vault_photos_dateTaken` ON `vault_photos` (`dateTaken`)")
+                db.execSQL("CREATE INDEX IF NOT EXISTS `index_vault_photos_bucketId_dateTaken` ON `vault_photos` (`bucketId`, `dateTaken`)")
+            }
+        }
+
         @Volatile
         private var INSTANCE: SnapJeDatabase? = null
 
@@ -53,7 +85,9 @@ abstract class SnapJeDatabase : RoomDatabase() {
                     SnapJeDatabase::class.java,
                     DATABASE_NAME
                 )
-                .fallbackToDestructiveMigration() // For development; use migrations in production
+                .addMigrations(MIGRATION_1_2)
+                // fallbackToDestructiveMigration 作为最后兜底（正常升级走 MIGRATION_1_2）
+                .fallbackToDestructiveMigration()
                 .addCallback(object : Callback() {
                     override fun onCreate(db: SupportSQLiteDatabase) {
                         super.onCreate(db)

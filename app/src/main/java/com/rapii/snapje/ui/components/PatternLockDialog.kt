@@ -1,32 +1,71 @@
 package com.rapii.snapje.ui.components
 
-import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
+import androidx.biometric.BiometricPrompt
 import androidx.compose.foundation.layout.*
-import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Fingerprint
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Dialog
+import androidx.fragment.app.FragmentActivity
+import com.rapii.snapje.util.BiometricAuthManager
 
 /**
- * Simple pattern/PIN lock dialog for authentication before sensitive operations.
- * Supports 4-digit PIN entry.
+ * 生物识别确认对话框（指纹 / 面部）。
+ *
+ * 替换了原来的硬编码 PIN（\"1234\"）锁：删除等敏感操作前要求指纹 / 面部验证。
+ * [correctPin] 参数为兼容旧调用保留，不再使用。
  */
 @Composable
 fun PatternLockDialog(
     onDismiss: () -> Unit,
     onUnlock: () -> Unit,
-    title: String = "Enter PIN to confirm",
-    correctPin: String = "1234" // In production, this should come from secure storage
+    title: String = "验证指纹以确认",
+    @Suppress("UNUSED_PARAMETER") correctPin: String = "1234"
 ) {
-    var enteredPin by remember { mutableStateOf("") }
-    var isError by remember { mutableStateOf(false) }
-    
+    val context = LocalContext.current
+    val fragmentActivity = remember { context as? FragmentActivity }
+
+    var isAuthenticating by remember { mutableStateOf(false) }
+    var errorMessage by remember { mutableStateOf<String?>(null) }
+
+    fun startAuthentication() {
+        val activity = fragmentActivity ?: return
+        isAuthenticating = true
+        errorMessage = null
+        BiometricAuthManager.authenticate(
+            activity = activity,
+            title = title,
+            subtitle = "验证指纹或面部以继续",
+            onSuccess = {
+                isAuthenticating = false
+                onUnlock()
+            },
+            onError = { errorCode, message ->
+                isAuthenticating = false
+                if (errorCode == BiometricPrompt.ERROR_NEGATIVE_BUTTON ||
+                    errorCode == BiometricPrompt.ERROR_USER_CANCELED
+                ) {
+                    errorMessage = "验证已取消"
+                } else if (errorCode == -1) {
+                    errorMessage = "验证失败，请重试"
+                } else {
+                    errorMessage = message
+                }
+            }
+        )
+    }
+
+    // 打开即自动弹出生物识别
+    LaunchedEffect(fragmentActivity) {
+        startAuthentication()
+    }
+
     Dialog(onDismissRequest = onDismiss) {
         Card(
             modifier = Modifier
@@ -40,170 +79,51 @@ fun PatternLockDialog(
                     .padding(24.dp),
                 horizontalAlignment = Alignment.CenterHorizontally
             ) {
+                Icon(
+                    imageVector = Icons.Default.Fingerprint,
+                    contentDescription = "Fingerprint",
+                    modifier = Modifier.size(64.dp),
+                    tint = MaterialTheme.colorScheme.primary
+                )
+                Spacer(modifier = Modifier.height(16.dp))
+
                 Text(
                     text = title,
                     style = MaterialTheme.typography.titleLarge,
-                    modifier = Modifier.padding(bottom = 24.dp)
+                    modifier = Modifier.padding(bottom = 8.dp)
                 )
-                
-                // PIN display
-                Row(
-                    horizontalArrangement = Arrangement.spacedBy(12.dp),
-                    modifier = Modifier.padding(bottom = 24.dp)
-                ) {
-                    repeat(4) { index ->
-                        Box(
-                            modifier = Modifier
-                                .size(48.dp)
-                                .clip(CircleShape)
-                                .background(
-                                    if (index < enteredPin.length) {
-                                        if (isError) MaterialTheme.colorScheme.error 
-                                        else MaterialTheme.colorScheme.primary
-                                    } else {
-                                        MaterialTheme.colorScheme.surfaceVariant
-                                    }
-                                ),
-                            contentAlignment = Alignment.Center
-                        ) {
-                            if (index < enteredPin.length) {
-                                Text(
-                                    text = "•",
-                                    style = MaterialTheme.typography.headlineMedium,
-                                    color = Color.White
-                                )
-                            }
-                        }
-                    }
-                }
-                
-                if (isError) {
+
+                Text(
+                    text = "验证指纹或面部以继续",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    textAlign = TextAlign.Center,
+                    modifier = Modifier.padding(bottom = 16.dp)
+                )
+
+                errorMessage?.let { message ->
                     Text(
-                        text = "Incorrect PIN",
+                        text = message,
                         color = MaterialTheme.colorScheme.error,
                         style = MaterialTheme.typography.bodyMedium,
                         modifier = Modifier.padding(bottom = 16.dp)
                     )
                 }
-                
-                // Numeric keypad
-                Column(
-                    horizontalAlignment = Alignment.CenterHorizontally,
-                    verticalArrangement = Arrangement.spacedBy(12.dp)
+
+                Button(
+                    onClick = { startAuthentication() },
+                    enabled = !isAuthenticating,
+                    modifier = Modifier.fillMaxWidth()
                 ) {
-                    repeat(3) { row ->
-                        Row(
-                            horizontalArrangement = Arrangement.spacedBy(16.dp),
-                            modifier = Modifier.padding(horizontal = 8.dp)
-                        ) {
-                            repeat(3) { col ->
-                                val number = row * 3 + col + 1
-                                NumberKeyButton(
-                                    number = number.toString(),
-                                    onClick = {
-                                        if (enteredPin.length < 4) {
-                                            enteredPin += number
-                                            isError = false
-                                            
-                                            // Check if PIN is complete
-                                            if (enteredPin.length == 4) {
-                                                if (enteredPin == correctPin) {
-                                                    onUnlock()
-                                                } else {
-                                                    isError = true
-                                                    enteredPin = ""
-                                                }
-                                            }
-                                        }
-                                    }
-                                )
-                            }
-                        }
-                    }
-                    
-                    // Bottom row: Clear, 0, Back
-                    Row(
-                        horizontalArrangement = Arrangement.spacedBy(16.dp),
-                        modifier = Modifier.padding(horizontal = 8.dp)
-                    ) {
-                        NumberKeyButton(
-                            number = "Clear",
-                            onClick = {
-                                enteredPin = ""
-                                isError = false
-                            },
-                            isAction = true
-                        )
-                        
-                        NumberKeyButton(
-                            number = "0",
-                            onClick = {
-                                if (enteredPin.length < 4) {
-                                    enteredPin += "0"
-                                    isError = false
-                                    
-                                    if (enteredPin.length == 4) {
-                                        if (enteredPin == correctPin) {
-                                            onUnlock()
-                                        } else {
-                                            isError = true
-                                            enteredPin = ""
-                                        }
-                                    }
-                                }
-                            }
-                        )
-                        
-                        NumberKeyButton(
-                            number = "⌫",
-                            onClick = {
-                                if (enteredPin.isNotEmpty()) {
-                                    enteredPin = enteredPin.dropLast(1)
-                                    isError = false
-                                }
-                            },
-                            isAction = true
-                        )
-                    }
+                    Text(if (isAuthenticating) "验证中…" else "重新验证")
                 }
-                
-                Spacer(modifier = Modifier.height(16.dp))
-                
+
+                Spacer(modifier = Modifier.height(8.dp))
+
                 TextButton(onClick = onDismiss) {
-                    Text("Cancel")
+                    Text("取消")
                 }
             }
         }
-    }
-}
-
-@Composable
-private fun NumberKeyButton(
-    number: String,
-    onClick: () -> Unit,
-    isAction: Boolean = false
-) {
-    Button(
-        onClick = onClick,
-        modifier = Modifier.size(64.dp),
-        colors = ButtonDefaults.buttonColors(
-            containerColor = if (isAction) {
-                MaterialTheme.colorScheme.surfaceVariant
-            } else {
-                MaterialTheme.colorScheme.primaryContainer
-            },
-            contentColor = if (isAction) {
-                MaterialTheme.colorScheme.onSurfaceVariant
-            } else {
-                MaterialTheme.colorScheme.onPrimaryContainer
-            }
-        ),
-        shape = CircleShape,
-        contentPadding = PaddingValues(0.dp)
-    ) {
-        Text(
-            text = number,
-            style = MaterialTheme.typography.titleLarge
-        )
     }
 }

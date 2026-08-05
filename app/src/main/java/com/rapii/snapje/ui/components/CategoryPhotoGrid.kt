@@ -51,11 +51,17 @@ fun CategoryPhotoGridItemWithLongPress(
                 )
             }
     ) {
+        val context = LocalContext.current
+        // 保险库照片使用无磁盘缓存的加载器（避免解密明文被 Coil 落盘）
+        val vaultLoader = remember(context) {
+            com.rapii.snapje.util.ImageLoaderFactory.createVaultLoader(context)
+        }
         AsyncImage(
             model = ImageRequest.Builder(LocalContext.current)
                 .data(photo.uri)
                 .crossfade(false)
                 .build(),
+            imageLoader = vaultLoader,
             contentDescription = null,
             modifier = Modifier.fillMaxSize(),
             contentScale = ContentScale.Crop

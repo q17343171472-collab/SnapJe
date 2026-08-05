@@ -23,8 +23,9 @@ class MainActivityTest {
     }
 
     @Test
-    fun home_screen_displays_app_name() {
-        // Verify app name is displayed
-        composeTestRule.onNodeWithText("PhotoX").assertExists()
+    fun auth_screen_displays_app_name() {
+        // 应用改为保险库模式：启动后先展示生物识别验证页（App 名为 "SnapJe!"）
+        // 注意：真机/模拟器需支持指纹或面部识别，否则停留在"设备不支持"提示页。
+        composeTestRule.onNodeWithText("SnapJe!").assertExists()
     }
 }

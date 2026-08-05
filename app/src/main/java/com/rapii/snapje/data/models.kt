@@ -12,10 +12,17 @@ data class PhotoItem(
     val size: Long = 0,
     val mimeType: String = "image/jpeg",
     val width: Int = 0,
-    val height: Int = 0
+    val height: Int = 0,
+    // 保险库照片 UUID（非 null 表示该照片来自加密保险库，而非 MediaStore）
+    val vaultId: String? = null
 ) {
     val aspectRatio: Float
         get() = if (height > 0) width.toFloat() / height.toFloat() else 1f
+
+    /**
+     * 是否为保险库（加密）照片。
+     */
+    val isVaultPhoto: Boolean get() = vaultId != null
 }
 
 data class Album(

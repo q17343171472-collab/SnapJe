@@ -6,8 +6,11 @@ import com.rapii.snapje.data.CachedPhotoRepository
 import com.rapii.snapje.data.PhotoRepository
 import com.rapii.snapje.data.PhotoRepositoryInterface
 import com.rapii.snapje.data.SettingsManager
+import com.rapii.snapje.data.VaultRepository
+import com.rapii.snapje.data.encryption.EncryptionManager
 import com.rapii.snapje.data.local.CategoryDao
 import com.rapii.snapje.data.local.PhotoDao
+import com.rapii.snapje.data.local.VaultPhotoDao
 import dagger.Module
 import dagger.Provides
 import dagger.hilt.InstallIn
@@ -76,5 +79,29 @@ object RepositoryModule {
         photoDao: PhotoDao
     ): CachedPhotoRepository {
         return CachedPhotoRepository(categoryDao, photoDao, photoRepository)
+    }
+
+    /**
+     * Provides EncryptionManager (Keystore-backed AES-256-GCM).
+     */
+    @Provides
+    @Singleton
+    fun provideEncryptionManager(
+        @ApplicationContext context: Context
+    ): EncryptionManager {
+        return EncryptionManager(context)
+    }
+
+    /**
+     * Provides VaultRepository (encrypted vault storage).
+     */
+    @Provides
+    @Singleton
+    fun provideVaultRepository(
+        @ApplicationContext context: Context,
+        encryptionManager: EncryptionManager,
+        vaultPhotoDao: VaultPhotoDao
+    ): VaultRepository {
+        return VaultRepository(context, encryptionManager, vaultPhotoDao)
     }
 }

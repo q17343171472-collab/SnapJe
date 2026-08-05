@@ -128,4 +128,31 @@
     <string name="permission_needed_for_rename">Permission needed for rename</string>  
     <string name="photo_restored_toast">Photo restored</string>  
     <string name="permanently_deleted_toast">Permanently deleted</string>  
+
+    <!-- Vault / Biometric Auth -->  
+    <string name="auth_required">验证指纹或面部以继续</string>  
+    <string name="auth_description">SnapJe 将您的照片加密存储在 App 内，只有您本人可以查看。</string>  
+    <string name="auth_retry">重新验证</string>  
+    <string name="auth_waiting">正在验证…</string>  
+    <string name="auth_cancelled">验证已取消，请重试</string>  
+    <string name="auth_failed_retry">验证失败，请重试</string>  
+    <string name="biometric_unavailable">此设备不支持指纹或面部识别，无法使用 SnapJe 保险库</string>  
+    <string name="exit_app">退出</string>  
+    <string name="add_photo">添加照片</string>  
+    <string name="pick_from_gallery">从系统相册选择</string>  
+    <string name="take_photo">拍照</string>  
+    <string name="vault_empty">保险库为空</string>  
+    <string name="vault_empty_message">点击右下角按钮，将照片加密存入保险库</string>  
+    <string name="import_success">已加密存入保险库</string>  
+    <string name="import_success_confirm">存入保险库</string>  
+    <string name="import_failed">导入失败：%1$s</string>  
+    <string name="vault_album_hint">相册名称</string>  
+    <string name="vault_default_album">我的保险库</string>  
+    <string name="confirm_delete_vault">删除后将无法恢复，确认删除？</string>  
+    <string name="delete_vault_photo">删除保险库照片</string>  
+    <string name="vault_photo_deleted">已从保险库删除</string>  
+    <string name="vault_photos_deleted">%1$d 张照片已从保险库删除</string>  
+    <string name="vault_renamed">已重命名</string>  
+    <string name="vault_op_not_supported">该操作仅支持系统相册照片</string>  
+    <string name="cd_fingerprint">指纹验证图标</string>  
 </resources>  
