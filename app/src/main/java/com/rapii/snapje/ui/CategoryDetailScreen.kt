@@ -245,14 +245,7 @@ fun CategoryDetailScreen(
             return
         }
         // 方案 2：ACTION_OPEN_DOCUMENT（通用，几乎所有设备可用）
-        openDocumentLauncher.launch(
-            Intent(Intent.ACTION_OPEN_DOCUMENT).apply {
-                addCategory(Intent.CATEGORY_OPENABLE)
-                type = "*/*"
-                putExtra(Intent.EXTRA_MIME_TYPES, arrayOf("image/*", "video/*"))
-                putExtra(Intent.EXTRA_ALLOW_MULTIPLE, true)
-            }
-        )
+        openDocumentLauncher.launch(arrayOf("image/*", "video/*"))
     }
 
     // 相机
