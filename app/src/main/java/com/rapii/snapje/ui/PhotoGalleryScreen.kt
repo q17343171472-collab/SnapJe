@@ -462,6 +462,12 @@ fun PhotoPage(
     onZoomStateChanged: (Boolean) -> Unit,
     vaultFullImageProvider: suspend (PhotoItem) -> Uri? = { null }
 ) {
+    // HF-3: 屏幕长边像素（方形约束，避免横屏照片被纵向硬拉到屏幕高度）
+    val context = LocalContext.current
+    val screenMaxEdge = remember(context) {
+        val dm = context.resources.displayMetrics
+        maxOf(dm.widthPixels, dm.heightPixels)
+    }
     var scale by remember { mutableFloatStateOf(1f) }
     var offset by remember { mutableStateOf(Offset.Zero) }
     var isZoomed by remember { mutableStateOf(false) }
@@ -610,7 +616,7 @@ fun PhotoPage(
             model = ImageRequest.Builder(LocalContext.current)
                 .data(displayUri)
                 .crossfade(false)
-                .size(Size.ORIGINAL)
+                .size(Size(screenMaxEdge, screenMaxEdge))
                 .bitmapConfig(Bitmap.Config.ARGB_8888)
                 .build(),
             contentDescription = photo.displayName,

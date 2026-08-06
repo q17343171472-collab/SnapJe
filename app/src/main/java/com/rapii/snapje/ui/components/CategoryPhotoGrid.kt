@@ -28,8 +28,19 @@ import coil.compose.AsyncImage
 import coil.request.ImageRequest
 import com.rapii.snapje.R
 import com.rapii.snapje.data.PhotoItem
+import coil.ImageLoader
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.Composable
+
+/** Composable wrapper that returns a single shared vault ImageLoader
+ *  for the current Composition. Used by grid items + photo page so we
+ *  don't allocate a new ImageLoader per recomposition. */
+@Composable
+internal fun rememberVaultImageLoader(context: android.content.Context): ImageLoader =
+    remember(context) { com.rapii.snapje.util.ImageLoaderFactory.createVaultLoader(context) }
 
 /**
+ * Grid item for displaying photos in a category.
  * Grid item for displaying photos in a category.
  * Supports click, long press, and selection state.
  */
@@ -54,14 +65,22 @@ fun CategoryPhotoGridItemWithLongPress(
             }
     ) {
         val context = LocalContext.current
-        // 保险库照片使用无磁盘缓存的加载器（避免解密明文被 Coil 落盘）
-        val vaultLoader = remember(context) {
-            com.rapii.snapje.util.ImageLoaderFactory.createVaultLoader(context)
+        // HF-5: vault ImageLoader 通过 Composable 共享，避免每个 grid item 重新 new 一个 ImageLoader
+        val vaultLoader = rememberVaultImageLoader(context)
+        // HF-4: 缩略图按当前 cell 尺寸（屏幕宽 / 列数）解码，避免 14 列模式多解 3.4× 像素
+        val defaultColumns = 3
+        val thumbnailSize = remember(context, defaultColumns) {
+            val screenWidthDp = context.resources.configuration.screenWidthDp
+            // -16 dp 总内边距，左右各 8 dp
+            val cellDp = (screenWidthDp - 16) / defaultColumns
+            val density = context.resources.displayMetrics.density
+            Size((cellDp * density).toInt(), (cellDp * density).toInt())
         }
         AsyncImage(
             model = ImageRequest.Builder(LocalContext.current)
                 .data(photo.uri)
                 .crossfade(false)
+                .size(thumbnailSize)
                 .build(),
             imageLoader = vaultLoader,
             contentDescription = null,

@@ -525,38 +525,6 @@ fun CategoryDetailScreen(
         }
     }
 
-    // Photo Gallery Screen
-    if (showPhotoGallery && galleryPhotos.isNotEmpty()) {
-        PhotoGalleryScreen(
-            photos = galleryPhotos,
-            initialPhotoIndex = galleryInitialIndex,
-            onBack = { showPhotoGallery = false },
-            onShare = { photo -> viewModel.sharePhoto(photo) },
-            allCategories = allCategories,
-            vaultFullImageProvider = { photo -> viewModel.fullImageUri(photo) },
-            vaultDeleteHandler = { photo ->
-                scope.launch {
-                    when (val result = viewModel.deleteVaultPhoto(photo)) {
-                        is Result.Loading -> {}
-                        is Result.Success -> {
-                            Toast.makeText(
-                                context,
-                                context.getString(R.string.vault_photo_deleted),
-                                Toast.LENGTH_SHORT
-                            ).show()
-                            viewModel.removePhotoFromList(photo)
-                        }
-                        is Result.Error -> {
-                            Toast.makeText(context.applicationContext, result.message, Toast.LENGTH_LONG).show()
-                        }
-                    }
-                }
-            },
-            vaultExportHandler = { photo -> exportVaultPhoto(photo) },
-            vaultPlayHandler = { photo -> playVideo(photo) }
-        )
-        return
-    }
 
     // File operations state
     var selectedPhoto by remember { mutableStateOf<PhotoItem?>(null) }
@@ -1226,6 +1194,38 @@ fun CategoryDetailScreen(
                     }
                 }
             }
+            // Photo Gallery Screen overlay (HF-1: 在 Scaffold Box 内作为 sibling，避免早期 return 重建整棵树导致黑闪)
+            if (showPhotoGallery && galleryPhotos.isNotEmpty()) {
+                PhotoGalleryScreen(
+                    photos = galleryPhotos,
+                    initialPhotoIndex = galleryInitialIndex,
+                    onBack = { showPhotoGallery = false },
+                    onShare = { photo -> viewModel.sharePhoto(photo) },
+                    allCategories = allCategories,
+                    vaultFullImageProvider = { photo -> viewModel.fullImageUri(photo) },
+                    vaultDeleteHandler = { photo ->
+                        scope.launch {
+                            when (val result = viewModel.deleteVaultPhoto(photo)) {
+                                is Result.Loading -> {}
+                                is Result.Success -> {
+                                    Toast.makeText(
+                                        context,
+                                        context.getString(R.string.vault_photo_deleted),
+                                        Toast.LENGTH_SHORT
+                                    ).show()
+                                    viewModel.removePhotoFromList(photo)
+                                }
+                                is Result.Error -> {
+                                    Toast.makeText(context.applicationContext, result.message, Toast.LENGTH_LONG).show()
+                                }
+                            }
+                        }
+                    },
+                    vaultExportHandler = { photo -> exportVaultPhoto(photo) },
+                    vaultPlayHandler = { photo -> playVideo(photo) }
+                )
+            }
+
         }
     }
 
